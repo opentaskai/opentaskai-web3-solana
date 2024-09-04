@@ -64,7 +64,7 @@ describe("payment", () => {
       mint,
       userToken,
       payerKeypair.publicKey,
-      1000000000 // 1000 tokens
+      1000000000000 // 1000 tokens
     );
 
     // Derive the program token account PDA
@@ -211,8 +211,8 @@ describe("payment", () => {
   });
 
   it("Deposits tokens", async () => {
-    const amount = new anchor.BN(100000000); // 100 tokens
-    const frozen = new anchor.BN(10000000); // 10 tokens
+    const amount = new anchor.BN(1000000000); // 1 tokens
+    const frozen = new anchor.BN(100000000); // 0.1 tokens
     const account = Array.from(Buffer.alloc(32).fill(TOKEN_DEPOSIT_ACCOUNT_FILL));
     const sn = Array.from(Keypair.generate().publicKey.toBuffer());
 
@@ -312,9 +312,9 @@ describe("payment", () => {
       const userTokenAccountInfo = await program.account.userTokenAccount.fetch(userTokenAccountPDA);
       console.log("User Token Account Info:", userTokenAccountInfo);
 
-      assert.strictEqual(userTokenAccountInfo.available.toString(), "90000000", "Available balance is incorrect");
-      assert.strictEqual(userTokenAccountInfo.frozen.toString(), "10000000", "Frozen balance is incorrect");
-      assert.strictEqual(programTokenBalanceAfter.value.amount, "100000000", "Program token balance is incorrect");
+      assert.strictEqual(userTokenAccountInfo.available.toString(), "900000000", "Available balance is incorrect");
+      assert.strictEqual(userTokenAccountInfo.frozen.toString(), "100000000", "Frozen balance is incorrect");
+      assert.strictEqual(programTokenBalanceAfter.value.amount, "1000000000", "Program token balance is incorrect");
     } catch (error) {
       console.error("Deposits tokens Error details:", error);
       if (error instanceof anchor.AnchorError) {
