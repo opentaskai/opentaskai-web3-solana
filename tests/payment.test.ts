@@ -19,7 +19,7 @@ describe("payment", () => {
   const program = anchor.workspace.Payment as Program<Payment>;
   let mint: PublicKey;
   let userTokenAccount: PublicKey;
-  let programToken: PublicKey;
+  let programTokenPDA: PublicKey;
   let paymentStatePDA: PublicKey;
   let programSolAccount: PublicKey;
   let payerKeypair: Keypair;
@@ -32,9 +32,6 @@ describe("payment", () => {
   const TOKEN_DEPOSIT_ACCOUNT_FILL = 3;
 
   before(async () => {
-    // Define account here
-    const account = Array.from(Buffer.alloc(32).fill(1));
-
     // Generate a new keypair for the payer
     payerKeypair = Keypair.generate();
 
@@ -81,7 +78,7 @@ describe("payment", () => {
     );
 
     // Derive the program token account PDA
-    [programToken] = PublicKey.findProgramAddressSync(
+    [programTokenPDA] = PublicKey.findProgramAddressSync(
       [Buffer.from("program-token"), mint.toBuffer()],
       program.programId
     );
@@ -90,31 +87,6 @@ describe("payment", () => {
       [Buffer.from("program-token"), spl.NATIVE_MINT.toBuffer()],
       program.programId
     );
-
-    // // Create program token account if it doesn't exist
-    // try {
-    //   await spl.getOrCreateAssociatedTokenAccount(
-    //     provider.connection,
-    //     payerKeypair,
-    //     mint,
-    //     programToken,
-    //     true // Allow owner off curve
-    //   );
-    //   console.log("Program token account created or already exists");
-    // } catch (error) {
-    //   console.error("Error creating program token account:", error);
-    //   throw error;
-    // }
-
-
-    // // Create SOL program account
-    // await spl.getOrCreateAssociatedTokenAccount(
-    //   provider.connection,
-    //   payerKeypair,
-    //   spl.NATIVE_MINT,
-    //   programSolAccount,
-    //   true
-    // );
 
     console.log("Program token account created or initialized");
 
@@ -165,7 +137,7 @@ describe("payment", () => {
           paymentState: paymentStatePDA,
           owner: payerKeypair.publicKey,
           mint: mint,
-          programToken: programToken,
+          programToken: programTokenPDA,
           tokenProgram: spl.TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
@@ -176,7 +148,7 @@ describe("payment", () => {
       console.log("SPL Program token initialized. Transaction signature:", tx);
 
       // Verify the initialization
-      const programTokenAccount = await spl.getAccount(provider.connection, programToken);
+      const programTokenAccount = await spl.getAccount(provider.connection, programTokenPDA);
       assert(programTokenAccount !== null, "Program token account should exist");
       assert.strictEqual(programTokenAccount.mint.toBase58(), mint.toBase58(), "Program token account mint doesn't match");
       assert.strictEqual(programTokenAccount.owner.toBase58(), paymentStatePDA.toBase58(), "Program token account owner doesn't match");
@@ -221,7 +193,7 @@ describe("payment", () => {
       [Buffer.from("program-token"), mint.toBuffer()],
       program.programId
     );
-    assert(programToken.equals(expectedProgramToken), "SPL Program token address is not correctly derived");
+    assert(programTokenPDA.equals(expectedProgramToken), "SPL Program token address is not correctly derived");
 
     const [expectedProgramSolAccount] = PublicKey.findProgramAddressSync(
       [Buffer.from("program-token"), spl.NATIVE_MINT.toBuffer()],
