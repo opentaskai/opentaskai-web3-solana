@@ -12,35 +12,15 @@ pub fn handler(
     sn: [u8; 32],
     expired_at: i64,
 ) -> Result<()> {
-    msg!("Withdraw handler started");
-    
     // Check if the record already exists
-    msg!("Checking if record already exists");
     require!(ctx.accounts.record.executed == false, ErrorCode::AlreadyExecuted);
-
-    // Check if the program token is initialized
-    msg!("Checking program token");
-    if ctx.accounts.mint.key() == anchor_spl::token::spl_token::native_mint::id() {
-        msg!("SOL withdraw");
-    } else {
-        msg!("SPL Token withdraw");
-        let program_token = TokenAccount::try_deserialize(&mut &ctx.accounts.program_token.data.borrow()[..])?;
-        require!(program_token.mint == ctx.accounts.mint.key(), ErrorCode::InvalidProgramToken);
-        msg!("Program token balance: {}", program_token.amount);
-    }
-
     // Check if the request is expired
-    msg!("Checking if request is expired");
     let clock = Clock::get()?;
     require!(clock.unix_timestamp < expired_at, ErrorCode::Expired);
 
     // Mark the record as executed
-    msg!("Marking record as executed");
     ctx.accounts.record.executed = true;
 
-    msg!("Program token owner: {}", ctx.accounts.program_token.owner);
-
-    // Update user account balances
     msg!("Updating user account balances");
     let user_token_account = &mut ctx.accounts.user_token_account;
     require!(user_token_account.available >= available, ErrorCode::InsufficientAvailable);
@@ -53,60 +33,16 @@ pub fn handler(
         user_token_account.mint = ctx.accounts.mint.key();
     }
 
-    msg!("Program token account: {}", ctx.accounts.program_token.key());
-
     // Transfer tokens
     let total_amount = available.checked_add(frozen).unwrap();
     msg!("Transferring tokens, total amount: {}", total_amount);
 
     if ctx.accounts.mint.key() == anchor_spl::token::spl_token::native_mint::id() {
-        // SOL transfer
-        msg!("PDA balance before: {}", ctx.accounts.program_token.lamports());
-        msg!("User balance before: {}", ctx.accounts.to.lamports());
-        let mint_key = ctx.accounts.mint.key();
-        let seeds = &[
-            b"program-token",
-            mint_key.as_ref(),
-            &[ctx.bumps.program_token],
-        ];
-
-        anchor_lang::solana_program::program::invoke_signed(
-            &anchor_lang::solana_program::system_instruction::transfer(
-                ctx.accounts.program_token.key,
-                ctx.accounts.to.key,
-                total_amount,
-            ),
-            &[
-                ctx.accounts.program_token.to_account_info(),
-                ctx.accounts.to.to_account_info(),
-                ctx.accounts.system_program.to_account_info(),
-            ],
-            &[seeds],
-        )?;
-
-        msg!("PDA balance after: {}", ctx.accounts.program_token.lamports());
-        msg!("User balance after: {}", ctx.accounts.to.lamports());
+        _handler_sol(&ctx, total_amount)?;
     } else {
-        // Token transfer
-        let seeds = &[
-            b"payment_state".as_ref(),
-            &[ctx.bumps.payment_state],
-        ];
-        token::transfer(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                token::Transfer {
-                    from: ctx.accounts.program_token.to_account_info(),
-                    to: ctx.accounts.to.to_account_info(),
-                    authority: ctx.accounts.payment_state.to_account_info(),
-                },
-                &[seeds],
-            ),
-            total_amount
-        )?;
+        _handler_token(&ctx, total_amount)?;
     }
 
-    msg!("Emitting withdraw event");
     // Emit withdraw event
     emit!(WithdrawEvent {
         sn,
@@ -118,6 +54,54 @@ pub fn handler(
         user: ctx.accounts.user.key(),
     });
 
-    msg!("Withdraw handler completed successfully");
+    Ok(())
+}
+
+fn _handler_sol(ctx: &Context<Withdraw>, amount: u64) -> Result<()> {
+    let mint_key = ctx.accounts.mint.key();
+    let seeds = &[
+        b"program-token",
+        mint_key.as_ref(),
+        &[ctx.bumps.program_token],
+    ];
+
+    anchor_lang::solana_program::program::invoke_signed(
+        &anchor_lang::solana_program::system_instruction::transfer(
+            ctx.accounts.program_token.key,
+            ctx.accounts.to.key,
+            amount,
+        ),
+        &[
+            ctx.accounts.program_token.to_account_info(),
+            ctx.accounts.to.to_account_info(),
+            ctx.accounts.system_program.to_account_info(),
+        ],
+        &[seeds],
+    )?;
+
+    Ok(())
+}
+
+fn _handler_token(ctx: &Context<Withdraw>, amount: u64) -> Result<()> {
+    // Check if the program token is initialized
+    let program_token = TokenAccount::try_deserialize(&mut &ctx.accounts.program_token.data.borrow()[..])?;
+    require!(program_token.mint == ctx.accounts.mint.key(), ErrorCode::InvalidProgramToken);
+
+    let seeds = &[
+        b"payment_state".as_ref(),
+        &[ctx.bumps.payment_state],
+    ];
+    token::transfer(
+        CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            token::Transfer {
+                from: ctx.accounts.program_token.to_account_info(),
+                to: ctx.accounts.to.to_account_info(),
+                authority: ctx.accounts.payment_state.to_account_info(),
+            },
+            &[seeds],
+        ),
+        amount
+    )?;
     Ok(())
 }

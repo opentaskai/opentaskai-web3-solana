@@ -4,12 +4,8 @@ use crate::InitializeProgramToken;
 
 pub fn handler(ctx: Context<InitializeProgramToken>) -> Result<()> {
     if ctx.accounts.mint.key() == token::spl_token::native_mint::id() {
-        msg!("Initializing program token for SOL");
-        msg!("Program token owner: {:?}", ctx.accounts.program_token.owner);
         // For SOL, we don't need to do anything extra as the SystemAccount is already initialized
     } else {
-        msg!("Initializing program token for SPL token");
-        msg!("Program token owner: {:?}", ctx.accounts.program_token.owner);
         // Manually initialize the token account
         token::initialize_account(CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
