@@ -13,7 +13,7 @@ pub fn handler(
     expired_at: i64,
 ) -> Result<()> {
     require!(ctx.accounts.payment_state.enabled, ErrorCode::Disabled);
-    require!(amount > frozen, ErrorCode::InvalidAmount);
+    require!(amount > 0 || frozen > 0, ErrorCode::ZeroAmount);
 
     let clock = Clock::get()?;
     require!(clock.unix_timestamp < expired_at, ErrorCode::Expired);
@@ -23,15 +23,18 @@ pub fn handler(
     ctx.accounts.record.executed = true;
 
     // Transfer tokens
-    if ctx.accounts.mint.key() == anchor_spl::token::spl_token::native_mint::id() {
-        _handler_sol(&ctx, amount)?;
-    } else {
-        _handler_token(&ctx, amount)?;
+    if amount > 0 { 
+      if ctx.accounts.mint.key() == anchor_spl::token::spl_token::native_mint::id() {
+          _handler_sol(&ctx, amount)?;
+      } else {
+          _handler_token(&ctx, amount)?;
+      }
     }
 
     // Update user_token_account
     let user_token_account = &mut ctx.accounts.user_token_account;
-    user_token_account.available = user_token_account.available.checked_add(amount - frozen).unwrap();
+    user_token_account.available = user_token_account.available.checked_add(amount).unwrap();
+    user_token_account.available = user_token_account.available.checked_sub(frozen).ok_or(ErrorCode::InsufficientAvailable)?;
     user_token_account.frozen = user_token_account.frozen.checked_add(frozen).unwrap();
     if user_token_account.mint == Pubkey::default() {
         user_token_account.mint = ctx.accounts.mint.key();

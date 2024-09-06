@@ -16,6 +16,8 @@ pub enum ErrorCode {
     InvalidMint,
     #[msg("Forbidden")]
     Forbidden,
+    #[msg("Cannot all be zero")]
+    ZeroAmount,
     #[msg("Insufficient funds")]
     InsufficientFunds,
     #[msg("Insufficient available balance")]

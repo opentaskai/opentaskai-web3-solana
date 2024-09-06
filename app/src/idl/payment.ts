@@ -594,21 +594,26 @@ export type Payment = {
     },
     {
       "code": 6007,
+      "name": "zeroAmount",
+      "msg": "Cannot all be zero"
+    },
+    {
+      "code": 6008,
       "name": "insufficientFunds",
       "msg": "Insufficient funds"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "insufficientAvailable",
       "msg": "Insufficient available balance"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "insufficientFrozen",
       "msg": "Insufficient frozen balance"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "invalidProgramToken",
       "msg": "Invalid program token"
     }
