@@ -80,7 +80,7 @@ pub fn _handler_token(
     require!(program_token.mint == ctx.accounts.mint.key(), ErrorCode::InvalidProgramToken);
 
     // Token transfer
-    let transfer_result = token::transfer(
+    token::transfer(
         CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
             token::Transfer {
@@ -90,14 +90,6 @@ pub fn _handler_token(
             },
         ),
         amount,
-    );
-
-    match transfer_result {
-        Ok(_) => msg!("Token transfer successful"),
-        Err(e) => {
-            msg!("Token transfer failed: {:?}", e);
-            return Err(e.into());
-        }
-    }
+    )?;
     Ok(())
 }
