@@ -53,7 +53,7 @@ pub struct Initialize<'info> {
         init,
         payer = owner,
         space = 8 + PaymentState::LEN,
-        seeds = [b"payment_state"],
+        seeds = [b"payment-state"],
         bump
     )]
     pub payment_state: Account<'info, PaymentState>,
@@ -130,7 +130,7 @@ pub struct Deposit<'info> {
 #[derive(Accounts)]
 #[instruction(from: [u8; 32], available: u64, frozen: u64, sn: [u8; 32], expired_at: i64)]
 pub struct Withdraw<'info> {
-    #[account(mut, seeds = [b"payment_state"], bump)]
+    #[account(mut, seeds = [b"payment-state"], bump)]
     pub payment_state: Account<'info, PaymentState>,
         #[account(
         init_if_needed,

@@ -55,7 +55,7 @@ export async function depositSol(
 ) {
   // Derive the payment state account PDA
   const [paymentStatePDA] = PublicKey.findProgramAddressSync(
-    [Buffer.from("payment_state")],
+    [Buffer.from("payment-state")],
     program.programId
   );
 
@@ -171,7 +171,7 @@ export async function depositTokens(
 ) {
   // Derive the payment state account PDA
   const [paymentStatePDA] = PublicKey.findProgramAddressSync(
-    [Buffer.from("payment_state")],
+    [Buffer.from("payment-state")],
     program.programId
   );
 

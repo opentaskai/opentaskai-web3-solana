@@ -73,7 +73,7 @@ describe("payment", () => {
 
     // Derive the payment state account PDA
     [paymentStatePDA] = PublicKey.findProgramAddressSync(
-      [Buffer.from("payment_state")],
+      [Buffer.from("payment-state")],
       program.programId
     );
 

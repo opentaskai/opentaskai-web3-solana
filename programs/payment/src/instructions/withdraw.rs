@@ -88,7 +88,7 @@ fn _handler_token(ctx: &Context<Withdraw>, amount: u64) -> Result<()> {
     require!(program_token.mint == ctx.accounts.mint.key(), ErrorCode::InvalidProgramToken);
 
     let seeds = &[
-        b"payment_state".as_ref(),
+        b"payment-state".as_ref(),
         &[ctx.bumps.payment_state],
     ];
     token::transfer(
