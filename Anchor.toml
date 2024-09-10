@@ -5,7 +5,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-payment = "7jrJjXs5mrvye9rofZW3MMnB2aeTFbb1vAccg5e1sCGC"
+payment = "5APtDhWVsehsQM4yoqPTzy36EJJLRBLVxXy9ApCK6BeH"
 
 [registry]
 url = "https://api.apr.dev"
@@ -15,10 +15,11 @@ cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.test.ts"
+test = "pnpm ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.test.ts"
 
 [workspace]
 types = "app/src/idl/"
 
 [test]
 startup_wait = 10000
+# validator = { url = "localhost:8899" }

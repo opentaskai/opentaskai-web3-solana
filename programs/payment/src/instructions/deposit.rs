@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount};
+use crate::utils::verify_signature;
 use crate::errors::ErrorCode;
 use crate::events::DepositEvent;
 use crate::Deposit;
@@ -11,6 +12,7 @@ pub fn handler(
     frozen: u64,
     sn: [u8; 32],
     expired_at: i64,
+    signature: [u8; 64],
 ) -> Result<()> {
     require!(ctx.accounts.payment_state.enabled, ErrorCode::Disabled);
     require!(amount > 0 || frozen > 0, ErrorCode::ZeroAmount);
@@ -18,6 +20,16 @@ pub fn handler(
     let clock = Clock::get()?;
     require!(clock.unix_timestamp < expired_at, ErrorCode::Expired);
 
+    let message = [&account[..], &amount.to_le_bytes(), &frozen.to_le_bytes(), &sn[..], &expired_at.to_le_bytes()].concat();
+    let public_key = ctx.accounts.payment_state.signer.as_ref();
+
+    verify_signature(
+        &ctx.accounts.ed25519_program,
+        public_key,
+        &message,
+        &signature
+    )?;
+    
     // Check if the transaction has already been executed
     require!(!ctx.accounts.record.executed, ErrorCode::AlreadyExecuted);
     ctx.accounts.record.executed = true;

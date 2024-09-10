@@ -1,3 +1,5 @@
+// @ts-ignore
+import nacl from 'tweetnacl';
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Payment } from "../target/types/payment";
@@ -15,8 +17,8 @@ import { depositSol, depositTokens, showUserTokenAccount, getTransactionFee } fr
 describe("payment", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
-
   const program = anchor.workspace.Payment as Program<Payment>;
+
   let mint: PublicKey;
   let userTokenAccount: PublicKey;
   let programTokenPDA: PublicKey;
@@ -335,6 +337,18 @@ describe("payment", () => {
     const userSolAccountInfoBefore = await program.account.userTokenAccount.fetch(userAccountPDA);
     showUserTokenAccount(userSolAccountInfoBefore, userAccountPDA, "User SOL Account Info before withdraw: ");
 
+    // Create and sign the message
+    const message = Buffer.concat([
+      Buffer.from(account),
+      withdrawAvailable.toArrayLike(Buffer, 'le', 8),
+      withdrawFrozen.toArrayLike(Buffer, 'le', 8),
+      Buffer.from(withdrawSN),
+      expiredAt.toArrayLike(Buffer, 'le', 8)
+    ]);
+    // Remove the hashing step
+    const signature = nacl.sign.detached(message, payerKeypair.secretKey);
+    console.log("Signature:", Buffer.from(signature).toString('hex'));
+
     let txSignature;
     try {
       txSignature = await program.methods
@@ -343,7 +357,8 @@ describe("payment", () => {
           withdrawAvailable,
           withdrawFrozen,
           withdrawSN,
-          expiredAt
+          expiredAt,
+          signature,
         )
         .accounts({
           paymentState: paymentStatePDA,
@@ -357,6 +372,7 @@ describe("payment", () => {
           tokenProgram: spl.TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
           associatedTokenProgram: spl.ASSOCIATED_TOKEN_PROGRAM_ID,
+          ed25519Program: new PublicKey('Ed25519SigVerify111111111111111111111111111'),
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
         })
         .signers([payerKeypair])
@@ -476,10 +492,21 @@ describe("payment", () => {
       program.programId
     );
 
+    // Create and sign the message
+    const message = Buffer.concat([
+      Buffer.from(account),
+      withdrawAvailable.toArrayLike(Buffer, 'le', 8),
+      withdrawFrozen.toArrayLike(Buffer, 'le', 8),
+      Buffer.from(withdrawSN),
+      expiredAt.toArrayLike(Buffer, 'le', 8)
+    ]);
+    // Remove the hashing step
+    const signature = nacl.sign.detached(message, payerKeypair.secretKey);
+    console.log("Signature:", Buffer.from(signature).toString('hex'));
 
     try {
       const tx = await program.methods
-        .withdraw(account, withdrawAvailable, withdrawFrozen, withdrawSN, expiredAt)
+        .withdraw(account, withdrawAvailable, withdrawFrozen, withdrawSN, expiredAt, signature)
         .accounts({
           paymentState: paymentStatePDA,
           userTokenAccount: userAccountPDA,
@@ -492,6 +519,7 @@ describe("payment", () => {
           tokenProgram: spl.TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
           associatedTokenProgram: spl.ASSOCIATED_TOKEN_PROGRAM_ID,
+          ed25519Program: new PublicKey('Ed25519SigVerify111111111111111111111111111'),
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
         })
         .signers([payerKeypair])

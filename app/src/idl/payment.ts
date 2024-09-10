@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/payment.json`.
  */
 export type Payment = {
-  "address": "7jrJjXs5mrvye9rofZW3MMnB2aeTFbb1vAccg5e1sCGC",
+  "address": "5APtDhWVsehsQM4yoqPTzy36EJJLRBLVxXy9ApCK6BeH",
   "metadata": {
     "name": "payment",
     "version": "0.1.0",
@@ -139,6 +139,10 @@ export type Payment = {
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
+          "name": "ed25519Program",
+          "address": "Ed25519SigVerify111111111111111111111111111"
+        },
+        {
           "name": "rent",
           "address": "SysvarRent111111111111111111111111111111111"
         }
@@ -173,6 +177,15 @@ export type Payment = {
         {
           "name": "expiredAt",
           "type": "i64"
+        },
+        {
+          "name": "signature",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
         }
       ]
     },
@@ -449,6 +462,10 @@ export type Payment = {
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
+          "name": "ed25519Program",
+          "address": "Ed25519SigVerify111111111111111111111111111"
+        },
+        {
           "name": "rent",
           "address": "SysvarRent111111111111111111111111111111111"
         }
@@ -483,6 +500,15 @@ export type Payment = {
         {
           "name": "expiredAt",
           "type": "i64"
+        },
+        {
+          "name": "signature",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
         }
       ]
     }

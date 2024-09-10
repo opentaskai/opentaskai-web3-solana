@@ -3,11 +3,12 @@ use anchor_spl::token::{Token};
 use anchor_spl::associated_token::AssociatedToken;
 use crate::state::{PaymentState, UserTokenAccount, TransactionRecord};
 
-declare_id!("7jrJjXs5mrvye9rofZW3MMnB2aeTFbb1vAccg5e1sCGC");
+declare_id!("5APtDhWVsehsQM4yoqPTzy36EJJLRBLVxXy9ApCK6BeH");
 
 pub mod state;
 pub mod errors;
 pub mod events;
+pub mod utils;
 pub mod instructions;
 
 use instructions::*;
@@ -31,8 +32,9 @@ pub mod payment {
         frozen: u64,
         sn: [u8; 32],
         expired_at: i64,
+        signature: [u8; 64],
     ) -> Result<()> {
-        deposit::handler(ctx, account, amount, frozen, sn, expired_at)
+        deposit::handler(ctx, account, amount, frozen, sn, expired_at, signature)
     }
 
     pub fn withdraw(
@@ -41,9 +43,10 @@ pub mod payment {
         available: u64,
         frozen: u64,
         sn: [u8; 32],
-        expired_at: i64
+        expired_at: i64,
+        signature: [u8; 64],
     ) -> Result<()> {
-        withdraw::handler(ctx, from, available, frozen, sn, expired_at)
+        withdraw::handler(ctx, from, available, frozen, sn, expired_at, signature)
     }
 }
 
@@ -124,6 +127,9 @@ pub struct Deposit<'info> {
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
+    /// CHECK: This account is used for ed25519 program invocation
+    #[account(address = solana_program::ed25519_program::id())]
+    pub ed25519_program: UncheckedAccount<'info>,
     pub rent: Sysvar<'info, Rent>,
 }
 
@@ -169,5 +175,8 @@ pub struct Withdraw<'info> {
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
+    /// CHECK: This account is used for ed25519 program invocation
+    #[account(address = solana_program::ed25519_program::id())]
+    pub ed25519_program: UncheckedAccount<'info>,
     pub rent: Sysvar<'info, Rent>,
 }

@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount};
+use crate::utils::verify_signature;
 use crate::errors::ErrorCode;
 use crate::events::WithdrawEvent;
 use crate::Withdraw;
@@ -11,6 +12,7 @@ pub fn handler(
     frozen: u64,
     sn: [u8; 32],
     expired_at: i64,
+    signature: [u8; 64],
 ) -> Result<()> {
     // Check if the record already exists
     require!(ctx.accounts.record.executed == false, ErrorCode::AlreadyExecuted);
@@ -18,10 +20,19 @@ pub fn handler(
     let clock = Clock::get()?;
     require!(clock.unix_timestamp < expired_at, ErrorCode::Expired);
 
+    let message = [&from[..], &available.to_le_bytes(), &frozen.to_le_bytes(), &sn[..], &expired_at.to_le_bytes()].concat();
+    let public_key = ctx.accounts.payment_state.signer.as_ref();
+
+    verify_signature(
+        &ctx.accounts.ed25519_program,
+        public_key,
+        &message,
+        &signature
+    )?;
+
     // Mark the record as executed
     ctx.accounts.record.executed = true;
 
-    msg!("Updating user account balances");
     let user_token_account = &mut ctx.accounts.user_token_account;
     require!(user_token_account.available >= available, ErrorCode::InsufficientAvailable);
     require!(user_token_account.frozen >= frozen, ErrorCode::InsufficientFrozen);
@@ -35,8 +46,6 @@ pub fn handler(
 
     // Transfer tokens
     let total_amount = available.checked_add(frozen).unwrap();
-    msg!("Transferring tokens, total amount: {}", total_amount);
-
     if ctx.accounts.mint.key() == anchor_spl::token::spl_token::native_mint::id() {
         _handler_sol(&ctx, total_amount)?;
     } else {

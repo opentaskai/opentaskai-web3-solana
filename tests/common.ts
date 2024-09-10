@@ -1,3 +1,4 @@
+import nacl from 'tweetnacl';
 import * as anchor from "@coral-xyz/anchor";
 import * as spl from "@solana/spl-token";
 import { Program } from "@coral-xyz/anchor";
@@ -95,20 +96,35 @@ export async function depositSol(
     userBalance / LAMPORTS_PER_SOL
   );
 
+  const userTokenAccount = payerKeypair.publicKey;
+  console.log("User token account:", userTokenAccount.toBase58());
+
+  // Create and sign the message
+  const message = Buffer.concat([
+    Buffer.from(account),
+    amount.toArrayLike(Buffer, 'le', 8),
+    frozen.toArrayLike(Buffer, 'le', 8),
+    Buffer.from(sn),
+    expiredAt.toArrayLike(Buffer, 'le', 8)
+  ]);
+  // Remove the hashing step
+  const signature = nacl.sign.detached(message, payerKeypair.secretKey);
+  console.log("Signature:", Buffer.from(signature).toString('hex'));
   try {
     const tx = await program.methods
-      .deposit(account, amount, frozen, sn, expiredAt)
+      .deposit(account, amount, frozen, sn, expiredAt, signature)
       .accounts({
         paymentState: paymentStatePDA,
         userTokenAccount: userAccountPDA,
         user: payerKeypair.publicKey,
-        userToken: payerKeypair.publicKey,
+        userToken: userTokenAccount,
         programToken: programAccountPDA,
         mint: spl.NATIVE_MINT,
         record: recordPubkey,
         tokenProgram: spl.TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
         associatedTokenProgram: spl.ASSOCIATED_TOKEN_PROGRAM_ID,
+        ed25519Program: new PublicKey('Ed25519SigVerify111111111111111111111111111'),
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
       })
       .signers([payerKeypair])
@@ -234,9 +250,20 @@ export async function depositTokens(
   const programTokenAccountBefore = await spl.getAccount(provider.connection, programTokenPDA);
   console.log("Program token account before deposit:", programTokenAccountBefore);
 
+  // Create and sign the message
+  const message = Buffer.concat([
+    Buffer.from(account),
+    amount.toArrayLike(Buffer, 'le', 8),
+    frozen.toArrayLike(Buffer, 'le', 8),
+    Buffer.from(sn),
+    expiredAt.toArrayLike(Buffer, 'le', 8)
+  ]);
+  // Remove the hashing step
+  const signature = nacl.sign.detached(message, payerKeypair.secretKey);
+  console.log("Signature:", Buffer.from(signature).toString('hex'));
   try {
     const tx = await program.methods
-      .deposit(account, amount, frozen, sn, expiredAt)
+      .deposit(account, amount, frozen, sn, expiredAt, signature)
       .accounts({
         paymentState: paymentStatePDA,
         userTokenAccount: userAccountPDA,
