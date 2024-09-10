@@ -1,4 +1,7 @@
 // @ts-ignore
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import nacl from 'tweetnacl';
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
@@ -15,6 +18,12 @@ import {
 import { depositSol, depositTokens, showUserTokenAccount, getTransactionFee } from "./common";
 
 describe("payment", () => {
+  // Read the keypair from the JSON file
+  const keypairFile = fs.readFileSync(path.join(os.homedir(), '.config', 'solana', 'id.json'), 'utf-8');
+  const keypairData = JSON.parse(keypairFile);
+  const payerKeypair = Keypair.fromSecretKey(new Uint8Array(keypairData));
+  console.log("Payer keypair:", payerKeypair.publicKey.toBase58());
+
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
   const program = anchor.workspace.Payment as Program<Payment>;
@@ -24,7 +33,6 @@ describe("payment", () => {
   let programTokenPDA: PublicKey;
   let paymentStatePDA: PublicKey;
   let programSolAccount: PublicKey;
-  let payerKeypair: Keypair;
 
   const expiredAt = new anchor.BN(new Date().getTime() / 1000 + 1000000000);
 
@@ -34,13 +42,10 @@ describe("payment", () => {
   const TOKEN_DEPOSIT_ACCOUNT_FILL = 3;
 
   before(async () => {
-    // Generate a new keypair for the payer
-    payerKeypair = Keypair.generate();
-
     // Request airdrop for the payer
     const airdropSignature = await provider.connection.requestAirdrop(
       payerKeypair.publicKey,
-      10 * LAMPORTS_PER_SOL
+      3 * LAMPORTS_PER_SOL
     );
     await provider.connection.confirmTransaction(airdropSignature);
 
@@ -294,7 +299,7 @@ describe("payment", () => {
 
   it("Deposits and then withdraws SOL", async () => {
     // Deposit SOL first
-    const depositAmount = new anchor.BN(2 * LAMPORTS_PER_SOL); // 2 SOL
+    const depositAmount = new anchor.BN(1 * LAMPORTS_PER_SOL); // 2 SOL
     const depositFrozen = new anchor.BN(LAMPORTS_PER_SOL / 10); // 0.1 SOL
     const account = Array.from(Buffer.alloc(32).fill(SOL_DEPOSIT_ACCOUNT_FILL));
     const depositSN = Array.from(Keypair.generate().publicKey.toBuffer());
@@ -393,7 +398,18 @@ describe("payment", () => {
       showUserTokenAccount(userSolAccountInfoAfter, userAccountPDA, "User SOL Account Info after withdraw: ");
 
       // Calculate the actual balance changes
-      const userBalanceChange = new anchor.BN(userBalanceAfter).sub(new anchor.BN(userBalanceBefore));
+      let userBalanceChange: anchor.BN;
+      try {
+        console.log("User balance after:", userBalanceAfter);
+        console.log("User balance before:", userBalanceBefore);
+        userBalanceChange = new anchor.BN(userBalanceAfter.toString()).sub(new anchor.BN(userBalanceBefore.toString()));
+        console.log("User balance change:", userBalanceChange.toString());
+      } catch (error) {
+        console.error("Error calculating user balance change:", error);
+        console.error("User balance after:", userBalanceAfter);
+        console.error("User balance before:", userBalanceBefore);
+        throw error;
+      }
       const programBalanceChange = new anchor.BN(programBalanceAfter).sub(new anchor.BN(programBalanceBefore));
       const totalWithdrawn = withdrawAvailable.add(withdrawFrozen);
       console.log("User balance change:", userBalanceChange.toString());
@@ -473,7 +489,8 @@ describe("payment", () => {
 
     // Get the user's associated token account
     const userATA = await spl.getAssociatedTokenAddress(mint, payerKeypair.publicKey);
-    console.log("User Token Balance before withdraw:", await spl.getAccount(provider.connection, userATA));
+    const userTokenBalanceBefore = await spl.getAccount(provider.connection, userATA);
+    console.log("User Token Balance before withdraw:", userTokenBalanceBefore.amount);
     showUserTokenAccount(userTokenAccountInfo, userATA, "User Token Account Info before withdraw: ");
 
     const withdrawAvailable = new anchor.BN(1000000000);

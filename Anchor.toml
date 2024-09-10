@@ -11,7 +11,7 @@ payment = "5APtDhWVsehsQM4yoqPTzy36EJJLRBLVxXy9ApCK6BeH"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "Localnet"  # Localnet, devnet, testnet, mainnet
 wallet = "~/.config/solana/id.json"
 
 [scripts]

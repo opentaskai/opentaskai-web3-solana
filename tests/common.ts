@@ -248,7 +248,7 @@ export async function depositTokens(
   console.log("User token account:", userTokenAccount.address.toBase58());
 
   const programTokenAccountBefore = await spl.getAccount(provider.connection, programTokenPDA);
-  console.log("Program token account before deposit:", programTokenAccountBefore);
+  console.log("Program token account before deposit:", programTokenAccountBefore.amount);
 
   // Create and sign the message
   const message = Buffer.concat([
@@ -289,7 +289,7 @@ export async function depositTokens(
 
 
     const programTokenAccountAfter = await spl.getAccount(provider.connection, programTokenPDA);
-    console.log("Program token account after deposit:", programTokenAccountAfter);
+    console.log("Program token account after deposit:", programTokenAccountAfter.amount);
 
     // Log balances after deposit
     const userTokenBalanceAfter =
