@@ -8,11 +8,11 @@ export async function identifySolanaNetwork(connection: Connection): Promise<str
 
     switch (genesisHash) {
       case "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d":
-        return "Mainnet Beta";
+        return "mainnet";
       case "4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY":
-        return "Testnet";
+        return "testnet";
       case "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG":
-        return "Devnet";
+        return "devnet";
       default:
         // For Localnet or custom networks
         if (slot === 0) {

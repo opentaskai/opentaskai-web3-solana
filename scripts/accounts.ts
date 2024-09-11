@@ -16,7 +16,7 @@ export async function getContract() {
 }
 
 export async function setContract(net:string, data:any) {
-  if(!["Mainnet Beta", "Testnet", "Devnet"].includes(net)) {
+  if(!["mainnet", "testnet", "devnet"].includes(net)) {
     return;
   }
   const contract = await getContract();
