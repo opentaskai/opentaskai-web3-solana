@@ -74,7 +74,7 @@ pub struct InitializeProgramToken<'info> {
     /// CHECK: This account is checked in the instruction handler
     pub mint: UncheckedAccount<'info>,
     #[account(
-        init,
+        init_if_needed,
         payer = owner,
         seeds = [b"program-token", mint.key().as_ref()],
         bump,

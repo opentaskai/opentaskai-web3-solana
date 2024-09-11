@@ -16,6 +16,7 @@ import {
 } from "@solana/web3.js";
 
 import { depositSol, depositTokens, showUserTokenAccount, getTransactionFee } from "./common";
+import { deployToken } from "../scripts/tokens";
 
 describe("payment", () => {
   // Read the keypair from the JSON file
@@ -50,13 +51,7 @@ describe("payment", () => {
     await provider.connection.confirmTransaction(airdropSignature);
 
     // Create a new mint
-    mint = await spl.createMint(
-      provider.connection,
-      payerKeypair,
-      payerKeypair.publicKey,
-      null,
-      9
-    );
+    mint = await deployToken(provider.connection, payerKeypair);
 
     // Create a token account for the user
     userTokenAccount = await spl
@@ -136,6 +131,8 @@ describe("payment", () => {
   });
   
   it("Initializes the program token", async () => {
+    let accountInfo = await provider.connection.getAccountInfo(programTokenPDA);
+    console.log("programTokenPDA accountInfo:", accountInfo);
     // Initialize SPL token
     try {
       const tx = await program.methods
@@ -166,6 +163,8 @@ describe("payment", () => {
       throw error;
     }
 
+    accountInfo = await provider.connection.getAccountInfo(programSolAccount);
+    console.log("programSolAccount accountInfo:", accountInfo);
     // Initialize SOL token
     try {
       const tx = await program.methods

@@ -2,6 +2,9 @@
   "license": "ISC",
   "scripts": {
     "test": "anchor test",
+    "cli": "ts-node",
+    "deploy-token": "ts-node scripts/tokens.ts",
+    "deploy-payment": "ts-node scripts/payment.ts",
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
   },

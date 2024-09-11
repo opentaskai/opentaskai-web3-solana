@@ -26,4 +26,6 @@ pub enum ErrorCode {
     InsufficientFrozen,
     #[msg("Invalid program token")]
     InvalidProgramToken,
+    #[msg("Token account has already been initialized")]
+    TokenAccountAlreadyInitialized,
 }

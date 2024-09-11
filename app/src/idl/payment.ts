@@ -642,6 +642,11 @@ export type Payment = {
       "code": 6011,
       "name": "invalidProgramToken",
       "msg": "Invalid program token"
+    },
+    {
+      "code": 6012,
+      "name": "tokenAccountAlreadyInitialized",
+      "msg": "Token account has already been initialized"
     }
   ],
   "types": [
