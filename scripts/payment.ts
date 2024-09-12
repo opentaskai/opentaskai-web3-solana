@@ -8,7 +8,7 @@ import { getContract, setContract } from './accounts';
 
 const BPF_LOADER_PROGRAM_ID = new web3.PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
 
-export async function deployPayment(connection: web3.Connection, payerKeypair: web3.Keypair = null) {
+export async function isPaymentDeployed(connection: web3.Connection, payerKeypair: web3.Keypair = null) {
   const network = await identifySolanaNetwork(connection);
   console.log("Network:", network);
 
@@ -40,11 +40,11 @@ export async function deployPayment(connection: web3.Connection, payerKeypair: w
     console.log('programInfo', programInfo);
     // Check if the program is already deployed
     if (await isProgramDeployed(programInfo, programData.length)) {
-      return programId;
+      return true;
     }
   }
 
-  return programId;
+  return false;
 
   //todo: deploy program
 }
@@ -76,7 +76,7 @@ async function isProgramDeployed(programInfo: web3.AccountInfo<any>, expectedDat
 async function main() {
   // Connect to devnet
   const connection = new web3.Connection(web3.clusterApiUrl("devnet"), "confirmed");
-  await deployPayment(connection);
+  await isPaymentDeployed(connection);
 }
 
-main().catch(console.error);
+// main().catch(console.error);

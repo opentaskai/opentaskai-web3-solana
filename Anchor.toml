@@ -14,7 +14,7 @@ payment = "5APtDhWVsehsQM4yoqPTzy36EJJLRBLVxXy9ApCK6BeH"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"  # Localnet, devnet, testnet, mainnet
+cluster = "Localnet"  # Localnet, devnet, testnet, mainnet
 wallet = "~/.config/solana/id.json"
 
 [scripts]
@@ -26,4 +26,5 @@ types = "app/src/idl/"
 
 [test]
 startup_wait = 10000
+# validator = { url = "https://api.devnet.solana.com" }
 # validator = { url = "localhost:8899" }

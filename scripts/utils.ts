@@ -32,7 +32,7 @@ export async function airdrop(payerKeypair: Keypair, connection: Connection, amo
   const balance = await connection.getBalance(payerKeypair.publicKey);
   console.log("Balance:", balance);
   if (balance < amount) {
-    console.log("Airdropping 1 SOL...");
+    console.log(`Airdropping ${amount} SOL...`);
     const airdropSignature = await connection.requestAirdrop(
       payerKeypair.publicKey,
       amount

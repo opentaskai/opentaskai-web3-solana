@@ -17,6 +17,7 @@ import {
 
 import { depositSol, depositTokens, showUserTokenAccount, getTransactionFee } from "./common";
 import { deployToken } from "../scripts/tokens";
+import { airdrop } from "../scripts/utils";
 
 describe("payment", () => {
   // Read the keypair from the JSON file
@@ -44,11 +45,7 @@ describe("payment", () => {
 
   before(async () => {
     // Request airdrop for the payer
-    const airdropSignature = await provider.connection.requestAirdrop(
-      payerKeypair.publicKey,
-      3 * LAMPORTS_PER_SOL
-    );
-    await provider.connection.confirmTransaction(airdropSignature);
+    await airdrop(payerKeypair, provider.connection, 3 * LAMPORTS_PER_SOL);
 
     // Create a new mint
     mint = await deployToken(provider.connection, payerKeypair);
