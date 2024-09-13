@@ -9,6 +9,9 @@ import {
   LAMPORTS_PER_SOL,
   SystemProgram,
 } from "@solana/web3.js";
+import * as secp256k1 from 'secp256k1';
+import { keccak256 } from 'js-sha3';
+import { getTokenAccountBalance } from "../scripts/tokens";
 
 export async function getTransactionFee(provider: anchor.AnchorProvider, txSignature: string) {
   // Fetch the transaction to get the exact fee (with retry logic)
@@ -42,6 +45,33 @@ export async function showUserTokenAccount(
     frozen: info.frozen.toString(),
   };
   console.log(mark, result);
+}
+
+export function signMessageForEd25519(message: Buffer, payerKeypair: Keypair) {
+  const signature = nacl.sign.detached(message, payerKeypair.secretKey);
+  console.log("Signature:", Buffer.from(signature).toString('hex'));
+  return signature;
+}
+
+export function signMessageForSecp256k1(message: Buffer, payerKeypair: Keypair) {
+  const messageHash = Buffer.from(keccak256.array(message));
+  const privateKey = payerKeypair.secretKey.slice(0, 32);
+  const { signature, recid } = secp256k1.ecdsaSign(messageHash, privateKey);
+  console.log("Signature:", Buffer.from(signature).toString('hex'));
+  console.log("Recid:", recid);
+  
+  const fullSignature = Buffer.concat([Buffer.from(signature), Buffer.from([recid])]);
+  
+  const publicKey = secp256k1.publicKeyCreate(privateKey, false);
+  const ethAddress = Buffer.from(keccak256(publicKey.slice(1)), 'hex').slice(-20);
+  
+  console.log("Message:", message.toString('hex'));
+  console.log("Message hash:", messageHash.toString('hex'));
+  console.log("Signature:", fullSignature.toString('hex'));
+  console.log("Ethereum address:", ethAddress.toString('hex'));
+  console.log("Solana public key:", payerKeypair.publicKey.toBase58());
+  
+  return fullSignature;
 }
 
 export async function depositSol(
@@ -87,6 +117,9 @@ export async function depositSol(
   console.log("Program SOL Account:", programAccountPDA.toBase58());
   console.log("Record:", recordPubkey.toBase58());
 
+  const paymentStateAccount = await program.account.paymentState.fetch(paymentStatePDA);
+  console.log("Payment state signer:", paymentStateAccount.signer.toBase58());
+
   // Log balance before deposit
   const userBalance = await provider.connection.getBalance(
     payerKeypair.publicKey
@@ -96,8 +129,13 @@ export async function depositSol(
     userBalance / LAMPORTS_PER_SOL
   );
 
-  const userTokenAccount = payerKeypair.publicKey;
-  console.log("User token account:", userTokenAccount.toBase58());
+  const userAccount = payerKeypair.publicKey;
+  console.log("User account:", userAccount.toBase58());
+
+  if (paymentStateAccount.signer.toBase58() !== userAccount.toBase58()) {
+    console.error("Payer public key does not match payment state signer!");
+    throw new Error("Payer public key mismatch");
+  }
 
   // Create and sign the message
   const message = Buffer.concat([
@@ -107,24 +145,22 @@ export async function depositSol(
     Buffer.from(sn),
     expiredAt.toArrayLike(Buffer, 'le', 8)
   ]);
-  // Remove the hashing step
-  const signature = nacl.sign.detached(message, payerKeypair.secretKey);
-  console.log("Signature:", Buffer.from(signature).toString('hex'));
+
+  const signature = signMessageForEd25519(message, payerKeypair);
   try {
     const tx = await program.methods
-      .deposit(account, amount, frozen, sn, expiredAt, signature)
+      .deposit(account, amount, frozen, sn, expiredAt, Array.from(signature))
       .accounts({
         paymentState: paymentStatePDA,
         userTokenAccount: userAccountPDA,
         user: payerKeypair.publicKey,
-        userToken: userTokenAccount,
+        userToken: userAccount,
         programToken: programAccountPDA,
         mint: spl.NATIVE_MINT,
         record: recordPubkey,
         tokenProgram: spl.TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
         associatedTokenProgram: spl.ASSOCIATED_TOKEN_PROGRAM_ID,
-        ed25519Program: new PublicKey('Ed25519SigVerify111111111111111111111111111'),
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
       })
       .signers([payerKeypair])
@@ -225,24 +261,8 @@ export async function depositTokens(
   console.log("User token account:", userTokenAccount.address.toBase58());
 
 
-  // Check if accounts exist and log their info
-  const userTokenInfo = await provider.connection.getAccountInfo(
-    userTokenAccount.address
-  );
-  console.log("User Token Account exists:", !!userTokenInfo);
-
-  // Log balances before deposit
-  if (userTokenInfo) {
-    const userTokenBalance = await provider.connection.getTokenAccountBalance(
-      userTokenAccount.address
-    );
-    console.log(
-      "User Token Balance before deposit:",
-      userTokenBalance.value.amount
-    );
-  } else {
-    console.log("User Token Account does not exist");
-  }
+  const userTokenBalance = await getTokenAccountBalance(provider.connection, mint, payerKeypair.publicKey);
+  console.log("User Token Balance before deposit:", userTokenBalance);
 
 
   console.log("User token account:", userTokenAccount.address.toBase58());
@@ -259,8 +279,7 @@ export async function depositTokens(
     expiredAt.toArrayLike(Buffer, 'le', 8)
   ]);
   // Remove the hashing step
-  const signature = nacl.sign.detached(message, payerKeypair.secretKey);
-  console.log("Signature:", Buffer.from(signature).toString('hex'));
+  const signature = signMessageForEd25519(message, payerKeypair);
   try {
     const tx = await program.methods
       .deposit(account, amount, frozen, sn, expiredAt, signature)
@@ -292,16 +311,11 @@ export async function depositTokens(
     console.log("Program token account after deposit:", programTokenAccountAfter.amount);
 
     // Log balances after deposit
-    const userTokenBalanceAfter =
-      await provider.connection.getTokenAccountBalance(
-        userTokenAccount.address
-      );
+    const userTokenBalanceAfter = await getTokenAccountBalance(provider.connection, mint, payerKeypair.publicKey);
     console.log(
       "User Token Balance after deposit:",
-      userTokenBalanceAfter.value.amount
+      userTokenBalanceAfter
     );
-
-
     const userTokenAccountInfo = await program.account.userTokenAccount.fetch(
       userAccountPDA
     );

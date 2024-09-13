@@ -139,10 +139,6 @@ export type Payment = {
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          "name": "ed25519Program",
-          "address": "Ed25519SigVerify111111111111111111111111111"
-        },
-        {
           "name": "rent",
           "address": "SysvarRent111111111111111111111111111111111"
         }
@@ -460,10 +456,6 @@ export type Payment = {
         {
           "name": "associatedTokenProgram",
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
-        },
-        {
-          "name": "ed25519Program",
-          "address": "Ed25519SigVerify111111111111111111111111111"
         },
         {
           "name": "rent",

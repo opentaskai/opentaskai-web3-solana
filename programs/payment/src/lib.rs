@@ -127,9 +127,6 @@ pub struct Deposit<'info> {
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-    /// CHECK: This account is used for ed25519 program invocation
-    #[account(address = solana_program::ed25519_program::id())]
-    pub ed25519_program: UncheckedAccount<'info>,
     pub rent: Sysvar<'info, Rent>,
 }
 
@@ -175,8 +172,5 @@ pub struct Withdraw<'info> {
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-    /// CHECK: This account is used for ed25519 program invocation
-    #[account(address = solana_program::ed25519_program::id())]
-    pub ed25519_program: UncheckedAccount<'info>,
     pub rent: Sysvar<'info, Rent>,
 }

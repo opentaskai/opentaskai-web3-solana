@@ -24,7 +24,6 @@ pub fn handler(
     let public_key = ctx.accounts.payment_state.signer.as_ref();
 
     verify_signature(
-        &ctx.accounts.ed25519_program,
         public_key,
         &message,
         &signature

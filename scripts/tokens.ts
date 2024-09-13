@@ -48,6 +48,28 @@ export async function deployToken(connection: web3.Connection, payerKeypair: web
   return mint;
 }
 
+export async function getTokenAccountBalance(connection: web3.Connection, mint: web3.PublicKey, owner: web3.PublicKey) {
+  // Find the associated token account address
+  const associatedTokenAddress = await token.getAssociatedTokenAddress(
+    mint,
+    owner
+  );
+
+  try {
+    // Attempt to get the token account balance
+    const balance = await connection.getTokenAccountBalance(associatedTokenAddress);
+    return BigInt(balance.value.amount);
+  } catch (error) {
+    if (error.message.includes("Account does not exist")) {
+      console.log("Token account does not exist");
+      return 0;
+    } else {
+      // Re-throw other errors
+      throw error;
+    }
+  }
+}
+
 async function main() {
   // Connect to devnet
   const connection = new web3.Connection(web3.clusterApiUrl("devnet"), "confirmed");

@@ -21,13 +21,11 @@ pub fn handler(
     require!(clock.unix_timestamp < expired_at, ErrorCode::Expired);
 
     let message = [&account[..], &amount.to_le_bytes(), &frozen.to_le_bytes(), &sn[..], &expired_at.to_le_bytes()].concat();
-    let public_key = ctx.accounts.payment_state.signer.as_ref();
-
+    
     verify_signature(
-        &ctx.accounts.ed25519_program,
-        public_key,
+        ctx.accounts.payment_state.signer.as_ref(),
         &message,
-        &signature
+        &signature,
     )?;
     
     // Check if the transaction has already been executed

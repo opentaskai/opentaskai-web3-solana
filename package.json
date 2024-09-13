@@ -2,6 +2,7 @@
   "license": "ISC",
   "scripts": {
     "test": "anchor test",
+    "test-dev": "anchor test --skip-deploy",
     "cli": "ts-node",
     "deploy-token": "ts-node scripts/tokens.ts",
     "deploy-payment": "ts-node scripts/payment.ts",
@@ -15,6 +16,8 @@
     "@project-serum/anchor": "^0.26.0",
     "@solana/spl-token": "^0.4.8",
     "@solana/web3.js": "^1.95.3",
+    "js-sha3": "^0.9.3",
+    "secp256k1": "^5.0.0",
     "tweetnacl": "^1.0.3"
   },
   "devDependencies": {

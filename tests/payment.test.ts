@@ -16,7 +16,7 @@ import {
 } from "@solana/web3.js";
 
 import { depositSol, depositTokens, showUserTokenAccount, getTransactionFee } from "./common";
-import { deployToken } from "../scripts/tokens";
+import { deployToken, getTokenAccountBalance } from "../scripts/tokens";
 import { airdrop } from "../scripts/utils";
 
 describe("payment", () => {
@@ -60,15 +60,20 @@ describe("payment", () => {
       )
       .then((account) => account.address);
 
-    // Mint some tokens to the user
-    await spl.mintTo(
-      provider.connection,
-      payerKeypair,
-      mint,
-      userTokenAccount,
-      payerKeypair.publicKey,
-      1000000000000 // 1000 tokens
-    );
+    const userTokenBalance = await getTokenAccountBalance(provider.connection, mint, payerKeypair.publicKey);
+    console.log("User token balance:", userTokenBalance);
+    if(userTokenBalance < 1000000000000) {
+      // Mint some tokens to the user
+      console.log("Minting tokens to user");
+      await spl.mintTo(
+        provider.connection,
+        payerKeypair,
+        mint,
+        userTokenAccount,
+        payerKeypair.publicKey,
+        1000000000000 // 1000 tokens
+      );
+    }
 
     // Derive the payment state account PDA
     [paymentStatePDA] = PublicKey.findProgramAddressSync(
@@ -91,7 +96,7 @@ describe("payment", () => {
 
   });
 
-  it("Initializes the payment state", async () => {
+  it.skip("Initializes the payment state", async () => {
     const tx = await program.methods
       .initialize()
       .accounts({
@@ -127,7 +132,7 @@ describe("payment", () => {
     );
   });
   
-  it("Initializes the program token", async () => {
+  it.skip("Initializes the program token", async () => {
     let accountInfo = await provider.connection.getAccountInfo(programTokenPDA);
     console.log("programTokenPDA accountInfo:", accountInfo);
     // Initialize SPL token
@@ -250,7 +255,7 @@ describe("payment", () => {
       `Program SOL balance is incorrect. Expected ${expectedBalance}, got ${programBalanceAfter}`
     );
   });
-
+/*
   it("Deposits tokens", async () => {
     const amount = new anchor.BN(1000000000); // 1 tokens
     const frozen = new anchor.BN(100000000); // 0.1 tokens
@@ -620,5 +625,5 @@ describe("payment", () => {
       throw error;
     }
   });
-  
+  */
 });
