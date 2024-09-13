@@ -96,7 +96,7 @@ describe("payment", () => {
 
   });
 
-  it.skip("Initializes the payment state", async () => {
+  it("Initializes the payment state", async () => {
     const tx = await program.methods
       .initialize()
       .accounts({
@@ -132,7 +132,7 @@ describe("payment", () => {
     );
   });
   
-  it.skip("Initializes the program token", async () => {
+  it("Initializes the program token", async () => {
     let accountInfo = await provider.connection.getAccountInfo(programTokenPDA);
     console.log("programTokenPDA accountInfo:", accountInfo);
     // Initialize SPL token
@@ -255,7 +255,7 @@ describe("payment", () => {
       `Program SOL balance is incorrect. Expected ${expectedBalance}, got ${programBalanceAfter}`
     );
   });
-/*
+
   it("Deposits tokens", async () => {
     const amount = new anchor.BN(1000000000); // 1 tokens
     const frozen = new anchor.BN(100000000); // 0.1 tokens
@@ -625,5 +625,5 @@ describe("payment", () => {
       throw error;
     }
   });
-  */
+  
 });

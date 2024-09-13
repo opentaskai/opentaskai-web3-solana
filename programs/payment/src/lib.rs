@@ -22,7 +22,15 @@ pub mod payment {
     }
 
     pub fn initialize_program_token(ctx: Context<InitializeProgramToken>) -> Result<()> {
-        initialize_program_token::handler(ctx)
+        admin::initialize_program_token(ctx)
+    }
+
+    pub fn change_owner(ctx: Context<ChangeOwner>, new_owner: Pubkey) -> Result<()> {
+        admin::change_owner(ctx, new_owner)
+    }
+
+    pub fn change_signer(ctx: Context<ChangeOwner>, new_signer: Pubkey) -> Result<()> {
+        admin::change_signer(ctx, new_signer)
     }
 
     pub fn deposit(
@@ -86,6 +94,15 @@ pub struct InitializeProgramToken<'info> {
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(Accounts)]
+pub struct ChangeOwner<'info> {
+    #[account(mut)]
+    pub payment_state: Account<'info, PaymentState>,
+    pub current_owner: Signer<'info>,
+    /// CHECK: This is the new owner
+    pub new_owner: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]

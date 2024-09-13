@@ -28,4 +28,6 @@ pub enum ErrorCode {
     InvalidProgramToken,
     #[msg("Token account has already been initialized")]
     TokenAccountAlreadyInitialized,
+    #[msg("Unauthorized")]
+    Unauthorized,
 }

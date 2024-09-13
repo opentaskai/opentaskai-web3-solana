@@ -14,6 +14,70 @@ export type Payment = {
   },
   "instructions": [
     {
+      "name": "changeOwner",
+      "discriminator": [
+        109,
+        40,
+        40,
+        90,
+        224,
+        120,
+        193,
+        184
+      ],
+      "accounts": [
+        {
+          "name": "paymentState",
+          "writable": true
+        },
+        {
+          "name": "currentOwner",
+          "signer": true
+        },
+        {
+          "name": "newOwner"
+        }
+      ],
+      "args": [
+        {
+          "name": "newOwner",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "changeSigner",
+      "discriminator": [
+        178,
+        235,
+        108,
+        157,
+        105,
+        50,
+        210,
+        90
+      ],
+      "accounts": [
+        {
+          "name": "paymentState",
+          "writable": true
+        },
+        {
+          "name": "currentOwner",
+          "signer": true
+        },
+        {
+          "name": "newOwner"
+        }
+      ],
+      "args": [
+        {
+          "name": "newSigner",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "deposit",
       "discriminator": [
         242,
@@ -639,6 +703,11 @@ export type Payment = {
       "code": 6012,
       "name": "tokenAccountAlreadyInitialized",
       "msg": "Token account has already been initialized"
+    },
+    {
+      "code": 6013,
+      "name": "unauthorized",
+      "msg": "unauthorized"
     }
   ],
   "types": [
