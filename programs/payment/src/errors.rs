@@ -26,8 +26,14 @@ pub enum ErrorCode {
     InsufficientFrozen,
     #[msg("Invalid program token")]
     InvalidProgramToken,
-    #[msg("Token account has already been initialized")]
-    TokenAccountAlreadyInitialized,
     #[msg("Unauthorized")]
     Unauthorized,
+    #[msg("Missing Ed25519 instruction")]
+    MissingEd25519Instruction,
+    #[msg("Invalid Ed25519 instruction")]
+    InvalidEd25519Instruction,
+    #[msg("Invalid public key")]
+    InvalidPublicKey,
+    #[msg("Invalid message")]
+    InvalidMessage,
 }

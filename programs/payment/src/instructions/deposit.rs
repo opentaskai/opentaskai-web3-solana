@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount};
-use crate::utils::verify_signature;
+use crate::utils::verify_ed25519_instruction;
 use crate::errors::ErrorCode;
 use crate::events::DepositEvent;
 use crate::Deposit;
@@ -21,8 +21,8 @@ pub fn handler(
     require!(clock.unix_timestamp < expired_at, ErrorCode::Expired);
 
     let message = [&account[..], &amount.to_le_bytes(), &frozen.to_le_bytes(), &sn[..], &expired_at.to_le_bytes()].concat();
-    
-    verify_signature(
+    verify_ed25519_instruction(
+        &ctx.accounts.instruction_sysvar,
         ctx.accounts.payment_state.signer.as_ref(),
         &message,
         &signature,

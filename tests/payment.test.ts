@@ -15,15 +15,15 @@ import {
   SystemProgram,
 } from "@solana/web3.js";
 
-import { depositSol, depositTokens, showUserTokenAccount, getTransactionFee } from "./common";
+import { deposit, depositSol, depositTokens, showUserTokenAccount, getTransactionFee } from "./common";
 import { deployToken, getTokenAccountBalance } from "../scripts/tokens";
 import { airdrop } from "../scripts/utils";
+import { loadKeypair } from "../scripts/accounts";
 
 describe("payment", () => {
   // Read the keypair from the JSON file
-  const keypairFile = fs.readFileSync(path.join(os.homedir(), '.config', 'solana', 'id.json'), 'utf-8');
-  const keypairData = JSON.parse(keypairFile);
-  const payerKeypair = Keypair.fromSecretKey(new Uint8Array(keypairData));
+  const keypairFile = path.join(os.homedir(), '.config', 'solana', 'id.json');
+  const payerKeypair = loadKeypair(keypairFile);
   console.log("Payer keypair:", payerKeypair.publicKey.toBase58());
 
   const provider = anchor.AnchorProvider.env();
@@ -210,6 +210,74 @@ describe("payment", () => {
     assert(programSolAccount.equals(expectedProgramSolAccount), "SOL Program token address is not correctly derived");
   });
 
+
+  it("Fails to deposit SOL with incorrect signature", async () => {
+    const amount = new anchor.BN(LAMPORTS_PER_SOL); // 1 SOL
+    const frozen = new anchor.BN(LAMPORTS_PER_SOL / 10); // 0.1 SOL
+    const account = Array.from(Buffer.alloc(32).fill(SOL_DEPOSIT_ACCOUNT_FILL));
+    const sn = Array.from(Keypair.generate().publicKey.toBuffer()); // Use a random SN for each test
+    const sn2 = Array.from(Keypair.generate().publicKey.toBuffer());
+
+    //test InvalidMessage
+    // Create and sign the message
+    let message = Buffer.concat([
+      Buffer.from(account),
+      amount.toArrayLike(Buffer, 'le', 8),
+      frozen.toArrayLike(Buffer, 'le', 8),
+      Buffer.from(sn2),
+      expiredAt.toArrayLike(Buffer, 'le', 8)
+    ]);
+
+    try {
+      await deposit(
+        provider,
+        program,
+        payerKeypair,
+        payerKeypair,
+        spl.NATIVE_MINT,
+        account,
+        sn,
+        amount,
+        frozen,
+        expiredAt,
+        message
+      );
+      assert.fail("Expected an error but the transaction succeeded");
+    } catch (error) {
+      assert.ok(error instanceof anchor.AnchorError);
+      assert.strictEqual(error.error.errorCode.code, "InvalidMessage");
+    }
+
+    //test InvalidPublicKey
+    message = Buffer.concat([
+      Buffer.from(account),
+      amount.toArrayLike(Buffer, 'le', 8),
+      frozen.toArrayLike(Buffer, 'le', 8),
+      Buffer.from(sn),
+      expiredAt.toArrayLike(Buffer, 'le', 8)
+    ]);
+    const signerKeypair = Keypair.generate();
+    try {
+      await deposit(
+        provider,
+        program,
+        payerKeypair,
+        signerKeypair,
+        spl.NATIVE_MINT,
+        account,
+        sn,
+        amount,
+        frozen,
+        expiredAt,
+        message
+      );
+      assert.fail("Expected an error but the transaction succeeded");
+    } catch (error) {
+      assert.ok(error instanceof anchor.AnchorError);
+      assert.strictEqual(error.error.errorCode.code, "InvalidPublicKey");
+    }
+  });
+
   it("Deposits SOL", async () => {
     const amount = new anchor.BN(LAMPORTS_PER_SOL); // 1 SOL
     const frozen = new anchor.BN(LAMPORTS_PER_SOL / 10); // 0.1 SOL
@@ -222,9 +290,9 @@ describe("payment", () => {
 
     const {
       userAccountPDA,
-      userSolAccountInfo,
-      userBalanceAfter,
-      programBalanceAfter,
+      userTokenAccountInfo,
+      userTokenBalanceAfter,
+      programTokenAccountAfter,
     } = await depositSol(
       provider,
       program,
@@ -237,12 +305,12 @@ describe("payment", () => {
     );
 
     assert.strictEqual(
-      userSolAccountInfo.available.toString(),
+      userTokenAccountInfo.available.toString(),
       amount.sub(frozen).toString(),
       "Available balance is incorrect"
     );
     assert.strictEqual(
-      userSolAccountInfo.frozen.toString(),
+      userTokenAccountInfo.frozen.toString(),
       frozen.toString(),
       "Frozen balance is incorrect"
     );
@@ -250,13 +318,13 @@ describe("payment", () => {
     const expectedBalance = new anchor.BN(programBalanceBefore).add(amount);
     console.log("Expected balance after deposit:", expectedBalance.toString());
     assert.strictEqual(
-      programBalanceAfter.toString(),
+      programTokenAccountAfter.toString(),
       expectedBalance.toString(),
-      `Program SOL balance is incorrect. Expected ${expectedBalance}, got ${programBalanceAfter}`
+      `Program SOL balance is incorrect. Expected ${expectedBalance}, got ${programTokenAccountAfter}`
     );
   });
 
-  it.skip("Deposits tokens", async () => {
+  it("Deposits tokens", async () => {
     const amount = new anchor.BN(1000000000); // 1 tokens
     const frozen = new anchor.BN(100000000); // 0.1 tokens
     const account = Array.from(
@@ -292,7 +360,7 @@ describe("payment", () => {
       "Frozen balance is incorrect"
     );
     assert.strictEqual(
-      programTokenAccountAfter.amount.toString(),
+      programTokenAccountAfter.toString(),
       "1000000000",
       "Program token balance is incorrect"
     );
@@ -307,9 +375,9 @@ describe("payment", () => {
 
     const {
       userAccountPDA,
-      userSolAccountInfo,
-      userBalanceAfter: userBalanceAfterDeposit,
-      programBalanceAfter: programBalanceAfterDeposit,
+      userTokenAccountInfo,
+      userTokenBalanceAfter,
+      programTokenAccountAfter,
     } = await depositSol(
       provider,
       program,

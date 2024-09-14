@@ -1,5 +1,4 @@
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import { Keypair } from '@solana/web3.js';
 
@@ -24,15 +23,20 @@ export async function setContract(net:string, data:any) {
   fs.writeFileSync(AccountFile, JSON.stringify(contract, null, 2));
 }
 
-export async function getBase58PublicKey(keypairPath:string) {
+export function loadKeypair(keypairPath:string) {
   const keypairJson = fs.readFileSync(keypairPath, 'utf-8');
   const keypairData = JSON.parse(keypairJson);
   const keypair = Keypair.fromSecretKey(new Uint8Array(keypairData));
+  return keypair;
+}
+
+export function getBase58PublicKey(keypairPath:string) {
+  const keypair = loadKeypair(keypairPath);
   return keypair.publicKey.toBase58();
 }
 
 const args = process.argv.slice(2);
-console.log(args);
-if(args.length > 0) {
-  getBase58PublicKey(args[0]).then(console.log).catch(console.error);
+console.log('accounts args:', args);
+if(args.length > 0 && args[0] !== '-r') {
+  console.log(getBase58PublicKey(args[0]));
 }

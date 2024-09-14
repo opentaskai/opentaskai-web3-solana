@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount};
-use crate::utils::verify_signature;
+use crate::utils::verify_ed25519_instruction;
 use crate::errors::ErrorCode;
 use crate::events::WithdrawEvent;
 use crate::Withdraw;
@@ -21,12 +21,11 @@ pub fn handler(
     require!(clock.unix_timestamp < expired_at, ErrorCode::Expired);
 
     let message = [&from[..], &available.to_le_bytes(), &frozen.to_le_bytes(), &sn[..], &expired_at.to_le_bytes()].concat();
-    let public_key = ctx.accounts.payment_state.signer.as_ref();
-
-    verify_signature(
-        public_key,
+    verify_ed25519_instruction(
+        &ctx.accounts.instruction_sysvar,
+        ctx.accounts.payment_state.signer.as_ref(),
         &message,
-        &signature
+        &signature,
     )?;
 
     // Mark the record as executed

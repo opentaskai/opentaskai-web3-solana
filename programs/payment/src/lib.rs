@@ -144,6 +144,8 @@ pub struct Deposit<'info> {
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
+    /// CHECK: This account is used to verify the Ed25519 instruction
+    pub instruction_sysvar: AccountInfo<'info>,
     pub rent: Sysvar<'info, Rent>,
 }
 
@@ -189,5 +191,7 @@ pub struct Withdraw<'info> {
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub associated_token_program: Program<'info, AssociatedToken>,
+    /// CHECK: This account is used to verify the Ed25519 instruction
+    pub instruction_sysvar: AccountInfo<'info>,
     pub rent: Sysvar<'info, Rent>,
 }

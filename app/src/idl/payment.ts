@@ -203,6 +203,9 @@ export type Payment = {
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
+          "name": "instructionSysvar"
+        },
+        {
           "name": "rent",
           "address": "SysvarRent111111111111111111111111111111111"
         }
@@ -522,6 +525,9 @@ export type Payment = {
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
+          "name": "instructionSysvar"
+        },
+        {
           "name": "rent",
           "address": "SysvarRent111111111111111111111111111111111"
         }
@@ -701,13 +707,28 @@ export type Payment = {
     },
     {
       "code": 6012,
-      "name": "tokenAccountAlreadyInitialized",
-      "msg": "Token account has already been initialized"
+      "name": "unauthorized",
+      "msg": "unauthorized"
     },
     {
       "code": 6013,
-      "name": "unauthorized",
-      "msg": "unauthorized"
+      "name": "missingEd25519Instruction",
+      "msg": "Missing Ed25519 instruction"
+    },
+    {
+      "code": 6014,
+      "name": "invalidEd25519Instruction",
+      "msg": "Invalid Ed25519 instruction"
+    },
+    {
+      "code": 6015,
+      "name": "invalidPublicKey",
+      "msg": "Invalid public key"
+    },
+    {
+      "code": 6016,
+      "name": "invalidMessage",
+      "msg": "Invalid message"
     }
   ],
   "types": [

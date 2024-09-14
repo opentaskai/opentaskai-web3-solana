@@ -49,22 +49,50 @@ export async function deployToken(connection: web3.Connection, payerKeypair: web
 }
 
 export async function getTokenAccountBalance(connection: web3.Connection, mint: web3.PublicKey, owner: web3.PublicKey) {
-  // Find the associated token account address
-  const associatedTokenAddress = await token.getAssociatedTokenAddress(
-    mint,
-    owner
-  );
-
   try {
-    // Attempt to get the token account balance
-    const balance = await connection.getTokenAccountBalance(associatedTokenAddress);
-    return BigInt(balance.value.amount);
+    if (mint.toBase58() === token.NATIVE_MINT.toBase58()) {
+      const balance = await connection.getBalance(owner);
+      return BigInt(balance);
+    } else {
+      // Find the associated token account address
+      const associatedTokenAddress = await token.getAssociatedTokenAddress(
+        mint,
+        owner
+      );
+      // Attempt to get the token account balance
+      const balance = await connection.getTokenAccountBalance(associatedTokenAddress);
+      return BigInt(balance.value.amount);
+    }
   } catch (error) {
     if (error.message.includes("Account does not exist")) {
       console.log("Token account does not exist");
       return 0;
     } else {
       // Re-throw other errors
+      console.error("getTokenAccountBalance Error:", error);
+      throw error;
+    }
+  }
+}
+
+export async function getAccountBalance(connection: web3.Connection, mint: web3.PublicKey, owner: web3.PublicKey) {
+  try {
+      if(mint.toBase58() === token.NATIVE_MINT.toBase58()) {
+      const balance = await connection.getBalance(owner);
+      console.log("SOL Balance:", balance);
+      return BigInt(balance);
+    } else {
+      const balance = await token.getAccount(connection, owner);
+      console.log("Token Balance:", balance);
+      return BigInt(balance.amount);
+    }
+  } catch (error) {
+    if (error.message.includes("Account does not exist")) {
+      console.log("Token account does not exist");
+      return 0;
+    } else {
+      // Re-throw other errors
+      console.error("getAccountBalance Error:", error);
       throw error;
     }
   }
