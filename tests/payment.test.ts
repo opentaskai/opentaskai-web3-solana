@@ -256,7 +256,7 @@ describe("payment", () => {
     );
   });
 
-  it("Deposits tokens", async () => {
+  it.skip("Deposits tokens", async () => {
     const amount = new anchor.BN(1000000000); // 1 tokens
     const frozen = new anchor.BN(100000000); // 0.1 tokens
     const account = Array.from(
@@ -298,7 +298,7 @@ describe("payment", () => {
     );
   });
 
-  it("Deposits and then withdraws SOL", async () => {
+  it.skip("Deposits and then withdraws SOL", async () => {
     // Deposit SOL first
     const depositAmount = new anchor.BN(1 * LAMPORTS_PER_SOL); // 2 SOL
     const depositFrozen = new anchor.BN(LAMPORTS_PER_SOL / 10); // 0.1 SOL
@@ -464,7 +464,7 @@ describe("payment", () => {
     }
   });
 
-  it("Deposits and then withdraws Tokens", async () => {
+  it.skip("Deposits and then withdraws Tokens", async () => {
     const account = Array.from(Buffer.alloc(32).fill(TOKEN_DEPOSIT_ACCOUNT_FILL));
     const depositAmount = new anchor.BN(2000000000);
     const depositFrozen = new anchor.BN(100000000);

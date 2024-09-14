@@ -21,8 +21,8 @@ help() {
 }
 write_buffer() {
   echo "Executing write-buffer deployment command:"
-  echo "solana program write-buffer ./target/deploy/payment.so --url $1"
-  solana program write-buffer ./target/deploy/payment.so --url $1
+  echo "solana program write-buffer ./target/deploy/payment.so  --buffer-authority ~/.config/solana/id.json --url $1 --with-compute-unit-price 1000"
+  solana program write-buffer ./target/deploy/payment.so  --buffer-authority ~/.config/solana/id.json --url $1 --with-compute-unit-price 1000
 }
 
 buffer_deployment() {
