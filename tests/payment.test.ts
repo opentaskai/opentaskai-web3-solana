@@ -15,8 +15,8 @@ import {
   SystemProgram,
 } from "@solana/web3.js";
 
-import { deposit, depositSol, depositTokens, showUserTokenAccount, getTransactionFee } from "./common";
-import { deployToken, getTokenAccountBalance } from "../scripts/tokens";
+import { depositWithMessage, depositSol, depositTokens, showUserTokenAccount, getTransactionFee, withdraw } from "./common";
+import { deployToken, getTokenAccountBalance, getAccountBalance } from "../scripts/tokens";
 import { airdrop } from "../scripts/utils";
 import { loadKeypair } from "../scripts/accounts";
 
@@ -229,7 +229,7 @@ describe("payment", () => {
     ]);
 
     try {
-      await deposit(
+      await depositWithMessage(
         provider,
         program,
         payerKeypair,
@@ -258,7 +258,7 @@ describe("payment", () => {
     ]);
     const signerKeypair = Keypair.generate();
     try {
-      await deposit(
+      await depositWithMessage(
         provider,
         program,
         payerKeypair,
@@ -288,6 +288,12 @@ describe("payment", () => {
     const programBalanceBefore = await provider.connection.getBalance(programSolAccount);
     console.log("Program SOL balance before deposit:", programBalanceBefore / LAMPORTS_PER_SOL);
 
+    const userTokenBalance = await getTokenAccountBalance(provider.connection, spl.NATIVE_MINT, payerKeypair.publicKey);
+    console.log("User Token Balance before deposit:", userTokenBalance);
+
+    const programTokenAccountBefore = await getAccountBalance(provider.connection, spl.NATIVE_MINT, programTokenPDA);
+    console.log("Program token account before deposit:", programTokenAccountBefore);
+    
     const {
       userAccountPDA,
       userTokenAccountInfo,
@@ -332,6 +338,12 @@ describe("payment", () => {
     );
     const sn = Array.from(Keypair.generate().publicKey.toBuffer());
 
+    const userTokenBalance = await getTokenAccountBalance(provider.connection, mint, payerKeypair.publicKey);
+    console.log("User Token Balance before deposit:", userTokenBalance);
+
+    const programTokenAccountBefore = await getAccountBalance(provider.connection, mint, programTokenPDA);
+    console.log("Program token account before deposit:", programTokenAccountBefore);
+    
     const {
       userAccountPDA,
       userTokenAccountInfo,
@@ -366,7 +378,7 @@ describe("payment", () => {
     );
   });
 
-  it.skip("Deposits and then withdraws SOL", async () => {
+  it("Deposits and then withdraws SOL", async () => {
     // Deposit SOL first
     const depositAmount = new anchor.BN(1 * LAMPORTS_PER_SOL); // 2 SOL
     const depositFrozen = new anchor.BN(LAMPORTS_PER_SOL / 10); // 0.1 SOL
@@ -396,12 +408,6 @@ describe("payment", () => {
 
     console.log("Withdraw SOL - Program Token PDA:", programSolAccount.toBase58());
 
-    // Derive the record account PDA for withdraw
-    const [withdrawRecordPubkey] = PublicKey.findProgramAddressSync(
-      [Buffer.from("record"), Buffer.from(withdrawSN)],
-      program.programId
-    );
-
     // Record balances before withdrawal
     const userBalanceBefore = await provider.connection.getBalance(payerKeypair.publicKey);
     const programBalanceBefore = await provider.connection.getBalance(programSolAccount);
@@ -411,128 +417,79 @@ describe("payment", () => {
     const userSolAccountInfoBefore = await program.account.userTokenAccount.fetch(userAccountPDA);
     showUserTokenAccount(userSolAccountInfoBefore, userAccountPDA, "User SOL Account Info before withdraw: ");
 
-    // Create and sign the message
-    const message = Buffer.concat([
-      Buffer.from(account),
-      withdrawAvailable.toArrayLike(Buffer, 'le', 8),
-      withdrawFrozen.toArrayLike(Buffer, 'le', 8),
-      Buffer.from(withdrawSN),
-      expiredAt.toArrayLike(Buffer, 'le', 8)
-    ]);
-    // Remove the hashing step
-    const signature = nacl.sign.detached(message, payerKeypair.secretKey);
-    console.log("Signature:", Buffer.from(signature).toString('hex'));
+    const tx =await withdraw(
+      provider,
+      program,
+      payerKeypair,
+      payerKeypair,
+      spl.NATIVE_MINT,
+      account,
+      userTokenAccount,
+      withdrawSN,
+      withdrawAvailable,
+      withdrawFrozen, 
+      expiredAt
+    );
 
-    let txSignature;
+    // Record balances after withdrawal
+    const userBalanceAfter = await provider.connection.getBalance(payerKeypair.publicKey);
+    const programBalanceAfter = await provider.connection.getBalance(programSolAccount);
+    console.log("User SOL Balance after withdraw:", userBalanceAfter / LAMPORTS_PER_SOL);
+    console.log("Program SOL Balance after withdraw:", programBalanceAfter / LAMPORTS_PER_SOL);
+
+    const userSolAccountInfoAfter = await program.account.userTokenAccount.fetch(userAccountPDA);
+    showUserTokenAccount(userSolAccountInfoAfter, userAccountPDA, "User SOL Account Info after withdraw: ");
+
+    // Calculate the actual balance changes
+    let userBalanceChange: anchor.BN;
     try {
-      txSignature = await program.methods
-        .withdraw(
-          account,
-          withdrawAvailable,
-          withdrawFrozen,
-          withdrawSN,
-          expiredAt,
-          signature,
-        )
-        .accounts({
-          paymentState: paymentStatePDA,
-          userTokenAccount: userAccountPDA,
-          user: payerKeypair.publicKey,
-          mint: spl.NATIVE_MINT,
-          to: payerKeypair.publicKey,
-          userToken: payerKeypair.publicKey,
-          programToken: programSolAccount,
-          record: withdrawRecordPubkey,
-          tokenProgram: spl.TOKEN_PROGRAM_ID,
-          systemProgram: SystemProgram.programId,
-          associatedTokenProgram: spl.ASSOCIATED_TOKEN_PROGRAM_ID,
-          ed25519Program: new PublicKey('Ed25519SigVerify111111111111111111111111111'),
-          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-        })
-        .signers([payerKeypair])
-        .rpc();
-
-      console.log("Withdraw Transaction signature:", txSignature);
-
-      // Wait for transaction confirmation
-      await provider.connection.confirmTransaction(txSignature);
-
-      // Record balances after withdrawal
-      const userBalanceAfter = await provider.connection.getBalance(payerKeypair.publicKey);
-      const programBalanceAfter = await provider.connection.getBalance(programSolAccount);
-      console.log("User SOL Balance after withdraw:", userBalanceAfter / LAMPORTS_PER_SOL);
-      console.log("Program SOL Balance after withdraw:", programBalanceAfter / LAMPORTS_PER_SOL);
-
-      const userSolAccountInfoAfter = await program.account.userTokenAccount.fetch(userAccountPDA);
-      showUserTokenAccount(userSolAccountInfoAfter, userAccountPDA, "User SOL Account Info after withdraw: ");
-
-      // Calculate the actual balance changes
-      let userBalanceChange: anchor.BN;
-      try {
-        console.log("User balance after:", userBalanceAfter);
-        console.log("User balance before:", userBalanceBefore);
-        userBalanceChange = new anchor.BN(userBalanceAfter.toString()).sub(new anchor.BN(userBalanceBefore.toString()));
-        console.log("User balance change:", userBalanceChange.toString());
-      } catch (error) {
-        console.error("Error calculating user balance change:", error);
-        console.error("User balance after:", userBalanceAfter);
-        console.error("User balance before:", userBalanceBefore);
-        throw error;
-      }
-      const programBalanceChange = new anchor.BN(programBalanceAfter).sub(new anchor.BN(programBalanceBefore));
-      const totalWithdrawn = withdrawAvailable.add(withdrawFrozen);
+      console.log("User balance before:", userBalanceBefore);
+      console.log("User balance after:", userBalanceAfter);
+      
+      userBalanceChange = new anchor.BN(userBalanceAfter.toString()).sub(new anchor.BN(userBalanceBefore.toString()));
       console.log("User balance change:", userBalanceChange.toString());
-      console.log("Program balance change:", programBalanceChange.toString());
-      console.log("Total withdrawn:", totalWithdrawn.toString());
-
-      const txFee = await getTransactionFee(provider, txSignature);
-      console.log("Transaction fee:", txFee);
-      // Check balance changes with fee consideration
-      const expectedUserBalanceChange = totalWithdrawn.sub(new anchor.BN(txFee));
-      const balanceDifference = userBalanceChange.sub(expectedUserBalanceChange).abs();
-      console.log("Expected user balance change:", expectedUserBalanceChange.toString());
-      console.log("Actual user balance change:", userBalanceChange.toString());
-      console.log("Balance difference:", balanceDifference.toString());
-
-      const allowedError = new anchor.BN(1000000); // Allow for a small error (0.001 SOL)
-
-      assert.ok(
-        balanceDifference.lte(allowedError),
-        `User balance change (${userBalanceChange.toString()}) should be close to expected change (${expectedUserBalanceChange.toString()}), difference: ${balanceDifference.toString()}`
-      );
-
-      // Check program balance change
-      assert.ok(
-        programBalanceChange.eq(totalWithdrawn.neg()),
-        `Program balance change (${programBalanceChange.toString()}) should equal negative of total withdrawn (${totalWithdrawn.neg().toString()})`
-      );
-
-      // Check user token account balance changes
-      assert.strictEqual(
-        userSolAccountInfoAfter.available.toString(),
-        new anchor.BN(userSolAccountInfoBefore.available).sub(withdrawAvailable).toString(),
-        "Available balance is incorrect after withdraw"
-      );
-      assert.strictEqual(
-        userSolAccountInfoAfter.frozen.toString(),
-        new anchor.BN(userSolAccountInfoBefore.frozen).sub(withdrawFrozen).toString(),
-        "Frozen balance is incorrect after withdraw"
-      );
-
     } catch (error) {
-      console.error("Withdraw SOL Error details:", error);
-      if (error instanceof anchor.AnchorError) {
-        console.log("Error code:", error.error.errorCode.code);
-        console.log("Error msg:", error.error.errorMessage);
-      } else if (error instanceof anchor.web3.SendTransactionError) {
-        console.log("Transaction Error:", error.message);
-        console.log("Error Logs:", error.logs);
-      }
+      console.error("Error calculating user balance change:", error);
+      console.error("User balance after:", userBalanceAfter);
+      console.error("User balance before:", userBalanceBefore);
       throw error;
     }
+    const programBalanceChange = new anchor.BN(programBalanceAfter).sub(new anchor.BN(programBalanceBefore));
+    const totalWithdrawn = withdrawAvailable.add(withdrawFrozen);
+    console.log("Program balance change:", programBalanceChange.toString());
+    console.log("Total withdrawn:", totalWithdrawn.toString());
+
+    const txFee = await getTransactionFee(provider, tx);
+    console.log("Transaction fee:", txFee);
+    // Check balance changes with fee consideration
+    const allowedError = new anchor.BN(1000000); // Allow for a small error (0.001 SOL)
+    console.log("Allowed error:", allowedError.toString());
+    assert.ok(
+      userBalanceChange.lte(allowedError),
+      `User balance change (${userBalanceChange.toString()}) should be close to expected change (${allowedError.toString()})`
+    );
+
+    // Check program balance change
+    assert.ok(
+      programBalanceChange.eq(totalWithdrawn.neg()),
+      `Program balance change (${programBalanceChange.toString()}) should equal negative of total withdrawn (${totalWithdrawn.neg().toString()})`
+    );
+
+    // Check user token account balance changes
+    assert.strictEqual(
+      userSolAccountInfoAfter.available.toString(),
+      new anchor.BN(userSolAccountInfoBefore.available).sub(withdrawAvailable).toString(),
+      "Available balance is incorrect after withdraw"
+    );
+    assert.strictEqual(
+      userSolAccountInfoAfter.frozen.toString(),
+      new anchor.BN(userSolAccountInfoBefore.frozen).sub(withdrawFrozen).toString(),
+      "Frozen balance is incorrect after withdraw"
+    );
+
   });
 
-  it.skip("Deposits and then withdraws Tokens", async () => {
+  it("Deposits and then withdraws Tokens", async () => {
     const account = Array.from(Buffer.alloc(32).fill(TOKEN_DEPOSIT_ACCOUNT_FILL));
     const depositAmount = new anchor.BN(2000000000);
     const depositFrozen = new anchor.BN(100000000);
@@ -590,108 +547,88 @@ describe("payment", () => {
     const signature = nacl.sign.detached(message, payerKeypair.secretKey);
     console.log("Signature:", Buffer.from(signature).toString('hex'));
 
-    try {
-      const tx = await program.methods
-        .withdraw(account, withdrawAvailable, withdrawFrozen, withdrawSN, expiredAt, signature)
-        .accounts({
-          paymentState: paymentStatePDA,
-          userTokenAccount: userAccountPDA,
-          user: payerKeypair.publicKey,
-          mint: mint,
-          to: userTokenAccount,
-          userToken: userTokenAccount,
-          programToken: programTokenPDA,
-          record: withdrawRecordPubkey,
-          tokenProgram: spl.TOKEN_PROGRAM_ID,
-          systemProgram: SystemProgram.programId,
-          associatedTokenProgram: spl.ASSOCIATED_TOKEN_PROGRAM_ID,
-          ed25519Program: new PublicKey('Ed25519SigVerify111111111111111111111111111'),
-          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-        })
-        .signers([payerKeypair])
-        .rpc();
+    const tx =await withdraw(
+      provider,
+      program,
+      payerKeypair,
+      payerKeypair,
+      mint,
+      account,
+      userTokenAccount,
+      withdrawSN,
+      withdrawAvailable,
+      withdrawFrozen, 
+      expiredAt
+    );
 
-      console.log("Withdraw Transaction signature:", tx);
+    // Record balance after withdrawal
+    const userTokenBalanceAfterWithdraw = await spl.getAccount(provider.connection, userATA);
+    console.log("User Token Balance after withdraw:", userTokenBalanceAfterWithdraw.amount.toString());
 
-      // Record balance after withdrawal
-      const userTokenBalanceAfter = await spl.getAccount(provider.connection, userATA);
-      console.log("User Token Balance after withdraw:", userTokenBalanceAfter.amount.toString());
+    const userTokenAccountInfoAfter = await program.account.userTokenAccount.fetch(userAccountPDA);
+    showUserTokenAccount(userTokenAccountInfoAfter, userAccountPDA, "User Token Account Info after withdraw: ");
 
-      const userTokenAccountInfoAfter = await program.account.userTokenAccount.fetch(userAccountPDA);
-      showUserTokenAccount(userTokenAccountInfoAfter, userAccountPDA, "User Token Account Info after withdraw: ");
+    // Log all relevant values for debugging
+    console.log(
+      "Initial available:",
+      userTokenAccountInfo.available.toString()
+    );
+    console.log(
+      "Initial frozen:",
+      userTokenAccountInfo.frozen.toString()
+    );
+    console.log("Withdraw amount:", withdrawAvailable.toString());
+    console.log("Withdraw frozen:", withdrawFrozen.toString());
 
-      // Log all relevant values for debugging
-      console.log(
-        "Initial available:",
-        userTokenAccountInfo.available.toString()
-      );
-      console.log(
-        "Initial frozen:",
-        userTokenAccountInfo.frozen.toString()
-      );
-      console.log("Withdraw amount:", withdrawAvailable.toString());
-      console.log("Withdraw frozen:", withdrawFrozen.toString());
+    // Calculate expected available and frozen balances
+    const expectedAvailable = new anchor.BN(
+      userTokenAccountInfo.available
+    )
+      .sub(withdrawAvailable)
+    const expectedFrozen = new anchor.BN(
+      userTokenAccountInfo.frozen
+    ).sub(withdrawFrozen);
 
-      // Calculate expected available and frozen balances
-      const expectedAvailable = new anchor.BN(
-        userTokenAccountInfo.available
-      )
-        .sub(withdrawAvailable)
-      const expectedFrozen = new anchor.BN(
-        userTokenAccountInfo.frozen
-      ).sub(withdrawFrozen);
+    console.log("Expected available:", expectedAvailable.toString());
+    console.log("Expected frozen:", expectedFrozen.toString());
+    console.log(
+      "Actual available:",
+      userTokenAccountInfoAfter.available.toString()
+    );
+    console.log(
+      "Actual frozen:",
+      userTokenAccountInfoAfter.frozen.toString()
+    );
 
-      console.log("Expected available:", expectedAvailable.toString());
-      console.log("Expected frozen:", expectedFrozen.toString());
-      console.log(
-        "Actual available:",
-        userTokenAccountInfoAfter.available.toString()
-      );
-      console.log(
-        "Actual frozen:",
-        userTokenAccountInfoAfter.frozen.toString()
-      );
+    // Strictly check balances
+    assert.strictEqual(
+      userTokenAccountInfoAfter.available.toString(),
+      expectedAvailable.toString(),
+      "Available balance is incorrect after withdraw"
+    );
 
-      // Strictly check balances
-      assert.strictEqual(
-        userTokenAccountInfoAfter.available.toString(),
-        expectedAvailable.toString(),
-        "Available balance is incorrect after withdraw"
-      );
+    assert.strictEqual(
+      userTokenAccountInfoAfter.frozen.toString(),
+      expectedFrozen.toString(),
+      "Frozen balance is incorrect after withdraw"
+    );
 
-      assert.strictEqual(
-        userTokenAccountInfoAfter.frozen.toString(),
-        expectedFrozen.toString(),
-        "Frozen balance is incorrect after withdraw"
-      );
+    // Check total balance change
+    const totalBalanceBefore = new anchor.BN(
+      userTokenAccountInfo.available
+    ).add(new anchor.BN(userTokenAccountInfo.frozen));
+    const totalBalanceAfter = new anchor.BN(
+      userTokenAccountInfoAfter.available
+    ).add(new anchor.BN(userTokenAccountInfoAfter.frozen));
+    const expectedTotalBalanceChange = withdrawAvailable
+      .add(withdrawFrozen)
+      .neg();
 
-      // Check total balance change
-      const totalBalanceBefore = new anchor.BN(
-        userTokenAccountInfo.available
-      ).add(new anchor.BN(userTokenAccountInfo.frozen));
-      const totalBalanceAfter = new anchor.BN(
-        userTokenAccountInfoAfter.available
-      ).add(new anchor.BN(userTokenAccountInfoAfter.frozen));
-      const expectedTotalBalanceChange = withdrawAvailable
-        .add(withdrawFrozen)
-        .neg();
-
-      assert.strictEqual(
-        totalBalanceAfter.sub(totalBalanceBefore).toString(),
-        expectedTotalBalanceChange.toString(),
-        "Total balance change is incorrect after withdraw"
-      );
-    } catch (error) {
-      console.error("Withdraw Token Error details:", error);
-      if (error instanceof anchor.AnchorError) {
-        console.log("Error code:", error.error.errorCode.code);
-        console.log("Error msg:", error.error.errorMessage);
-      } else if (error instanceof anchor.web3.SendTransactionError) {
-        console.log("Transaction Error:", error.message);
-        console.log("Error Logs:", error.logs);
-      }
-      throw error;
-    }
+    assert.strictEqual(
+      totalBalanceAfter.sub(totalBalanceBefore).toString(),
+      expectedTotalBalanceChange.toString(),
+      "Total balance change is incorrect after withdraw"
+    );
   });
   
 });

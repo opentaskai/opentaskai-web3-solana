@@ -86,15 +86,7 @@ export async function depositSol(
   frozen: anchor.BN,
   expiredAt: anchor.BN
 ) {
-  // Create and sign the message
-  const message = Buffer.concat([
-    Buffer.from(account),
-    amount.toArrayLike(Buffer, 'le', 8),
-    frozen.toArrayLike(Buffer, 'le', 8),
-    Buffer.from(sn),
-    expiredAt.toArrayLike(Buffer, 'le', 8)
-  ]);
-  return deposit(provider, program, payerKeypair, payerKeypair, spl.NATIVE_MINT, account, sn, amount, frozen, expiredAt, message);
+  return deposit(provider, program, payerKeypair, payerKeypair, spl.NATIVE_MINT, account, sn, amount, frozen, expiredAt);
 }
 
 export async function depositTokens(
@@ -108,19 +100,11 @@ export async function depositTokens(
   frozen: anchor.BN,
   expiredAt: anchor.BN
 ) {
-  // Create and sign the message
-  const message = Buffer.concat([
-    Buffer.from(account),
-    amount.toArrayLike(Buffer, 'le', 8),
-    frozen.toArrayLike(Buffer, 'le', 8),
-    Buffer.from(sn),
-    expiredAt.toArrayLike(Buffer, 'le', 8)
-  ]);
-  return deposit(provider, program, payerKeypair, payerKeypair, mint, account, sn, amount, frozen, expiredAt, message);
+  return deposit(provider, program, payerKeypair, payerKeypair, mint, account, sn, amount, frozen, expiredAt);
 }
 
 
-export async function deposit(
+export async function depositWithMessage(
   provider: anchor.AnchorProvider,
   program: Program<Payment>,
   payerKeypair: Keypair,
@@ -131,7 +115,7 @@ export async function deposit(
   amount: anchor.BN,
   frozen: anchor.BN,
   expiredAt: anchor.BN,
-  message: Buffer
+  message: Buffer = null
 ) {
   // Derive the payment state account PDA
   const [paymentStatePDA] = PublicKey.findProgramAddressSync(
@@ -176,11 +160,17 @@ export async function deposit(
   }
   console.log("User token account:", tokenAccount.toBase58());
 
-  const userTokenBalance = await getTokenAccountBalance(provider.connection, mint, payerKeypair.publicKey);
-  console.log("User Token Balance before deposit:", userTokenBalance);
+  if (message == null) {
+    // Create and sign the message
+    message = Buffer.concat([
+      Buffer.from(account),
+      amount.toArrayLike(Buffer, 'le', 8),
+      frozen.toArrayLike(Buffer, 'le', 8),
+      Buffer.from(sn),
+      expiredAt.toArrayLike(Buffer, 'le', 8)
+    ]);
+  }
 
-  const programTokenAccountBefore = await getAccountBalance(provider.connection, mint, programTokenPDA);
-  console.log("Program token account before deposit:", programTokenAccountBefore);
   const signature = signMessageForEd25519(message, signerKeypair);
   try {
     const ed25519Instruction = Ed25519Program.createInstructionWithPublicKey({
@@ -228,13 +218,13 @@ export async function deposit(
     const userTokenAccountInfo = await program.account.userTokenAccount.fetch(
       userAccountPDA
     );
+
     showUserTokenAccount(
       userTokenAccountInfo,
       userAccountPDA,
       "User Token Account: "
     );
     
-
     return {
       userAccountPDA,
       userTokenAccountInfo,
@@ -246,6 +236,129 @@ export async function deposit(
     if (error instanceof anchor.AnchorError) {
       console.log("Error code:", error.error.errorCode.code);
       console.log("Error msg:", error.error.errorMessage);
+    }
+    throw error;
+  }
+}
+
+
+export async function deposit(
+  provider: anchor.AnchorProvider,
+  program: Program<Payment>,
+  payerKeypair: Keypair,
+  signerKeypair: Keypair,
+  mint: PublicKey,
+  account: number[],
+  sn: number[],
+  amount: anchor.BN,
+  frozen: anchor.BN,
+  expiredAt: anchor.BN,
+) {
+  return depositWithMessage(provider, program, payerKeypair, signerKeypair, mint, account, sn, amount, frozen, expiredAt);
+}
+
+export async function withdraw(
+  provider: anchor.AnchorProvider,
+  program: Program<Payment>,
+  payerKeypair: Keypair,
+  signerKeypair: Keypair,
+  mint: PublicKey,
+  account: number[],
+  to: PublicKey,
+  sn: number[],
+  available: anchor.BN,
+  frozen: anchor.BN,
+  expiredAt: anchor.BN
+) {
+  // Derive the payment state account PDA
+  const [paymentStatePDA] = PublicKey.findProgramAddressSync(
+    [Buffer.from("payment-state")],
+    program.programId
+  );
+
+  // Derive the user token account PDA
+  const [userAccountPDA] = PublicKey.findProgramAddressSync(
+    [Buffer.from("user-token"), Buffer.from(account), mint.toBuffer()],
+    program.programId
+  );
+
+  // Derive the program token account PDA
+  const [programTokenPDA] = PublicKey.findProgramAddressSync(
+    [Buffer.from("program-token"), mint.toBuffer()],
+    program.programId
+  );
+
+  // Derive the record account PDA
+  const [recordPubkey] = PublicKey.findProgramAddressSync(
+    [Buffer.from("record"), Buffer.from(sn)],
+    program.programId
+  );
+
+  let tokenAccount = payerKeypair.publicKey;
+  if (mint.toBase58() !== "So11111111111111111111111111111111111111112") {
+    // Ensure user token account exists and is an associated token account
+    const userTokenAccount = await spl.getOrCreateAssociatedTokenAccount(
+      provider.connection,
+      payerKeypair,
+      mint,
+      payerKeypair.publicKey
+    );
+    tokenAccount = userTokenAccount.address;
+  }
+  console.log("User token account:", tokenAccount.toBase58());
+
+  // Create and sign the message
+  const message = Buffer.concat([
+    Buffer.from(account),
+    available.toArrayLike(Buffer, 'le', 8),
+    frozen.toArrayLike(Buffer, 'le', 8),
+    Buffer.from(sn),
+    expiredAt.toArrayLike(Buffer, 'le', 8)
+  ]);
+
+  try {
+    const signature = signMessageForEd25519(message, signerKeypair);
+    const ed25519Instruction = Ed25519Program.createInstructionWithPublicKey({
+      publicKey: signerKeypair.publicKey.toBytes(),
+      message: message,
+      signature: signature,
+    });
+    const tx = await program.methods
+      .withdraw(account, available, frozen, sn, expiredAt, signature)
+      .accounts({
+        paymentState: paymentStatePDA,
+        userTokenAccount: userAccountPDA,
+        user: payerKeypair.publicKey,
+        mint: mint,
+        to,
+        userToken: to,
+        programToken: programTokenPDA,
+        record: recordPubkey,
+        tokenProgram: spl.TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        associatedTokenProgram: spl.ASSOCIATED_TOKEN_PROGRAM_ID,
+        instructionSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+      })
+      .preInstructions([ed25519Instruction])
+      .signers([payerKeypair])
+      .rpc();
+
+    console.log("Transaction signature:", tx);
+    const txResult = await provider.connection.confirmTransaction(tx, 'confirmed');
+    if (txResult.value.err) {
+      console.error("Transaction failed:", txResult.value.err);
+      throw new Error("Transaction failed");
+    }
+    return tx;
+  } catch (error) {
+    console.error("Withdraw Token Error details:", error);
+    if (error instanceof anchor.AnchorError) {
+      console.log("Error code:", error.error.errorCode.code);
+      console.log("Error msg:", error.error.errorMessage);
+    } else if (error instanceof anchor.web3.SendTransactionError) {
+      console.log("Transaction Error:", error.message);
+      console.log("Error Logs:", error.logs);
     }
     throw error;
   }
