@@ -29,14 +29,19 @@ export async function identifySolanaNetwork(connection: Connection): Promise<str
 
 export async function airdrop(payerKeypair: Keypair, connection: Connection, amount: number) {
   // Airdrop some SOL to the token creator if needed
-  const balance = await connection.getBalance(payerKeypair.publicKey);
-  console.log("Balance:", balance);
-  if (balance < amount) {
-    console.log(`Airdropping ${amount} SOL...`);
-    const airdropSignature = await connection.requestAirdrop(
-      payerKeypair.publicKey,
-      amount
-    );
-    await connection.confirmTransaction(airdropSignature);
+  try {
+    const balance = await connection.getBalance(payerKeypair.publicKey);
+    console.log("Balance:", balance);
+    if (balance < amount) {
+      console.log(`Airdropping ${amount} SOL...`);
+      const airdropSignature = await connection.requestAirdrop(
+        payerKeypair.publicKey,
+        amount
+      );
+      await connection.confirmTransaction(airdropSignature);
+    }
+  } catch (error) {
+    console.error(`Error fetching ${payerKeypair.publicKey} balance:`, error);
+    throw error;
   }
 }

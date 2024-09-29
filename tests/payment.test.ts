@@ -28,10 +28,11 @@ describe("payment", () => {
 
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
+  console.log("RPC Endpoint:", provider.connection.rpcEndpoint);
   const program = anchor.workspace.Payment as Program<Payment>;
   const programId = program.programId;
   console.log("Payment Program ID:", programId.toString());
-  
+
   let mint: PublicKey;
   let userTokenAccount: PublicKey;
   let programTokenPDA: PublicKey;
