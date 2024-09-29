@@ -2,6 +2,7 @@
 FULL_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$FULL_DIR" || exit
 echo `pwd`
+export SOLANA_RPC_TIMEOUT=1200
 
 action="$1"
 network="$2"
@@ -33,8 +34,8 @@ buffer_deployment() {
 
 standard_deployment() {
   echo "Executing standard deployment command:"
-  echo "solana program deploy --program-id $2 ./target/deploy/payment.so --upgrade-authority ~/.config/solana/id.json --url $1 --with-compute-unit-price 1000"
-  solana program deploy --program-id $2 ./target/deploy/payment.so --upgrade-authority ~/.config/solana/id.json --url $1 --with-compute-unit-price 1000
+  echo "solana program deploy --program-id $2 ./target/deploy/payment.so --upgrade-authority ~/.config/solana/id.json --url $1 --with-compute-unit-price 1000 --skip-fee-check"
+  solana program deploy --program-id $2 ./target/deploy/payment.so --upgrade-authority ~/.config/solana/id.json --url $1 --with-compute-unit-price 1000 --skip-fee-check
 }
 
 case "$action" in

@@ -1,6 +1,8 @@
 {
   "license": "ISC",
   "scripts": {
+    "newpubkey": "solana-keygen new --outfile target/deploy/payment-keypair.json",
+    "build": "anchor clean & anchor build",
     "test": "anchor test",
     "test-dev": "anchor test --skip-deploy",
     "cli": "ts-node",

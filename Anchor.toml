@@ -5,11 +5,11 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-payment = "5APtDhWVsehsQM4yoqPTzy36EJJLRBLVxXy9ApCK6BeH"
+payment = "7mEtBse9oundTRfuYNTmPBaYr1gGNM5sewKDo23meJXe"
 ed25519_program = "Ed25519SigVerify111111111111111111111111111"
 
 [programs.devnet]
-payment = "5APtDhWVsehsQM4yoqPTzy36EJJLRBLVxXy9ApCK6BeH"
+payment = "7mEtBse9oundTRfuYNTmPBaYr1gGNM5sewKDo23meJXe"
 ed25519_program = "Ed25519SigVerify111111111111111111111111111"
 
 [registry]
