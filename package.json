@@ -20,7 +20,8 @@
     "@solana/web3.js": "^1.95.3",
     "js-sha3": "^0.9.3",
     "secp256k1": "^5.0.0",
-    "tweetnacl": "^1.0.3"
+    "tweetnacl": "^1.0.3",
+    "uuid": "^10.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

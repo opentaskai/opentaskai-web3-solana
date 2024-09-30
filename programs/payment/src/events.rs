@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 
+// #[derive(Debug)]
 #[event]
 pub struct DepositEvent {
     pub sn: [u8; 32],

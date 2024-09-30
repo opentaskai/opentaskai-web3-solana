@@ -17,7 +17,7 @@ import {
 
 import { depositWithMessage, depositSol, depositTokens, showUserTokenAccount, getTransactionFee, withdraw } from "./common";
 import { deployToken, getTokenAccountBalance, getAccountBalance } from "../scripts/tokens";
-import { airdrop } from "../scripts/utils";
+import { airdrop, uuid, bytes32Buffer, bufferToArray } from "../scripts/utils";
 import { loadKeypair } from "../scripts/accounts";
 
 describe("payment", () => {
@@ -42,9 +42,9 @@ describe("payment", () => {
   const expiredAt = new anchor.BN(new Date().getTime() / 1000 + 1000000000);
 
   // Define constants at the beginning of the describe block
-  const PAYMENT_STATE_ACCOUNT_FILL = 1;
-  const SOL_DEPOSIT_ACCOUNT_FILL = 2;
-  const TOKEN_DEPOSIT_ACCOUNT_FILL = 3;
+  const PAYMENT_STATE_ACCOUNT_FILL = Buffer.alloc(32).fill(1).toString('hex');
+  const SOL_DEPOSIT_ACCOUNT_FILL = Buffer.alloc(32).fill(2).toString('hex');
+  const TOKEN_DEPOSIT_ACCOUNT_FILL = Buffer.alloc(32).fill(3).toString('hex')
 
   before(async () => {
     // Request airdrop for the payer
@@ -98,7 +98,11 @@ describe("payment", () => {
     console.log("Program token account created or initialized");
 
   });
-
+  
+  it("test", async () => {
+    bytes32Buffer('a49948c0c7084ca39a2776c940c65550')
+  });
+  
   it("Initializes the payment state", async () => {
     const tx = await program.methods
       .initialize()
@@ -128,13 +132,14 @@ describe("payment", () => {
       "Payment state should be enabled"
     );
 
+    console.log('paymentStateAccount.feeToAccount:', paymentStateAccount.feeToAccount);
     assert.deepStrictEqual(
       paymentStateAccount.feeToAccount,
-      Array(32).fill(PAYMENT_STATE_ACCOUNT_FILL),
+      bufferToArray(bytes32Buffer(PAYMENT_STATE_ACCOUNT_FILL)),
       "Fee to account doesn't match"
     );
   });
-  
+
   it("Initializes the program token", async () => {
     let accountInfo = await provider.connection.getAccountInfo(programTokenPDA);
     console.log("programTokenPDA accountInfo:", accountInfo);
@@ -217,17 +222,17 @@ describe("payment", () => {
   it("Fails to deposit SOL with incorrect signature", async () => {
     const amount = new anchor.BN(LAMPORTS_PER_SOL); // 1 SOL
     const frozen = new anchor.BN(LAMPORTS_PER_SOL / 10); // 0.1 SOL
-    const account = Array.from(Buffer.alloc(32).fill(SOL_DEPOSIT_ACCOUNT_FILL));
-    const sn = Array.from(Keypair.generate().publicKey.toBuffer()); // Use a random SN for each test
-    const sn2 = Array.from(Keypair.generate().publicKey.toBuffer());
+    const account = String(SOL_DEPOSIT_ACCOUNT_FILL);
+    const sn = uuid(); // Use a random SN for each test
+    const sn2 = uuid();
 
     //test InvalidMessage
     // Create and sign the message
     let message = Buffer.concat([
-      Buffer.from(account),
+      bytes32Buffer(account),
       amount.toArrayLike(Buffer, 'le', 8),
       frozen.toArrayLike(Buffer, 'le', 8),
-      Buffer.from(sn2),
+      bytes32Buffer(sn2),
       expiredAt.toArrayLike(Buffer, 'le', 8)
     ]);
 
@@ -253,10 +258,10 @@ describe("payment", () => {
 
     //test InvalidPublicKey
     message = Buffer.concat([
-      Buffer.from(account),
+      bytes32Buffer(account),
       amount.toArrayLike(Buffer, 'le', 8),
       frozen.toArrayLike(Buffer, 'le', 8),
-      Buffer.from(sn),
+      bytes32Buffer(sn),
       expiredAt.toArrayLike(Buffer, 'le', 8)
     ]);
     const signerKeypair = Keypair.generate();
@@ -284,9 +289,9 @@ describe("payment", () => {
   it("Deposits SOL", async () => {
     const amount = new anchor.BN(LAMPORTS_PER_SOL); // 1 SOL
     const frozen = new anchor.BN(LAMPORTS_PER_SOL / 10); // 0.1 SOL
-    const account = Array.from(Buffer.alloc(32).fill(SOL_DEPOSIT_ACCOUNT_FILL));
-    const sn = Array.from(Keypair.generate().publicKey.toBuffer()); // Use a random SN for each test
-
+    const account = String(SOL_DEPOSIT_ACCOUNT_FILL);
+    const sn = uuid(); // Use a random SN for each test
+    console.log('sn:', sn);
     // Get the initial balance of the program SOL account
     const programBalanceBefore = await provider.connection.getBalance(programSolAccount);
     console.log("Program SOL balance before deposit:", programBalanceBefore / LAMPORTS_PER_SOL);
@@ -336,10 +341,8 @@ describe("payment", () => {
   it("Deposits tokens", async () => {
     const amount = new anchor.BN(1000000000); // 1 tokens
     const frozen = new anchor.BN(100000000); // 0.1 tokens
-    const account = Array.from(
-      Buffer.alloc(32).fill(TOKEN_DEPOSIT_ACCOUNT_FILL)
-    );
-    const sn = Array.from(Keypair.generate().publicKey.toBuffer());
+    const account = String(TOKEN_DEPOSIT_ACCOUNT_FILL);
+    const sn = uuid();
 
     const userTokenBalance = await getTokenAccountBalance(provider.connection, mint, payerKeypair.publicKey);
     console.log("User Token Balance before deposit:", userTokenBalance);
@@ -385,8 +388,8 @@ describe("payment", () => {
     // Deposit SOL first
     const depositAmount = new anchor.BN(1 * LAMPORTS_PER_SOL); // 2 SOL
     const depositFrozen = new anchor.BN(LAMPORTS_PER_SOL / 10); // 0.1 SOL
-    const account = Array.from(Buffer.alloc(32).fill(SOL_DEPOSIT_ACCOUNT_FILL));
-    const depositSN = Array.from(Keypair.generate().publicKey.toBuffer());
+    const account = String(SOL_DEPOSIT_ACCOUNT_FILL);
+    const depositSN = uuid();
 
     const {
       userAccountPDA,
@@ -407,7 +410,7 @@ describe("payment", () => {
     // Now perform withdraw
     const withdrawAvailable = new anchor.BN(LAMPORTS_PER_SOL); // 1 SOL
     const withdrawFrozen = new anchor.BN(LAMPORTS_PER_SOL / 20); // 0.05 SOL
-    const withdrawSN = Array.from(Keypair.generate().publicKey.toBuffer());
+    const withdrawSN = uuid();
 
     console.log("Withdraw SOL - Program Token PDA:", programSolAccount.toBase58());
 
@@ -493,7 +496,7 @@ describe("payment", () => {
   });
 
   it("Deposits and then withdraws Tokens", async () => {
-    const account = Array.from(Buffer.alloc(32).fill(TOKEN_DEPOSIT_ACCOUNT_FILL));
+    const account = String(TOKEN_DEPOSIT_ACCOUNT_FILL);
     const depositAmount = new anchor.BN(2000000000);
     const depositFrozen = new anchor.BN(100000000);
 
@@ -509,7 +512,7 @@ describe("payment", () => {
       payerKeypair,
       mint,
       account,
-      Array.from(Keypair.generate().publicKey.toBuffer()),
+      uuid(),
       depositAmount,
       depositFrozen,
       expiredAt
@@ -524,7 +527,7 @@ describe("payment", () => {
 
     const withdrawAvailable = new anchor.BN(1000000000);
     const withdrawFrozen = new anchor.BN(50000000);
-    const withdrawSN = Array.from(Keypair.generate().publicKey.toBuffer());
+    const withdrawSN = uuid();
 
     // Derive the program token account PDA
     const [programTokenPDA] = PublicKey.findProgramAddressSync(
@@ -534,16 +537,16 @@ describe("payment", () => {
 
     // Derive the withdraw record PDA
     const [withdrawRecordPubkey] = PublicKey.findProgramAddressSync(
-      [Buffer.from("record"), Buffer.from(withdrawSN)],
+      [Buffer.from("record"), bytes32Buffer(withdrawSN)],
       program.programId
     );
 
     // Create and sign the message
     const message = Buffer.concat([
-      Buffer.from(account),
+      bytes32Buffer(account),
       withdrawAvailable.toArrayLike(Buffer, 'le', 8),
       withdrawFrozen.toArrayLike(Buffer, 'le', 8),
-      Buffer.from(withdrawSN),
+      bytes32Buffer(withdrawSN),
       expiredAt.toArrayLike(Buffer, 'le', 8)
     ]);
     // Remove the hashing step

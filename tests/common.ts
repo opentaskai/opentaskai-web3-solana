@@ -14,6 +14,8 @@ import {
 import * as secp256k1 from 'secp256k1';
 import { keccak256 } from 'js-sha3';
 import { getTokenAccountBalance, getAccountBalance } from "../scripts/tokens";
+import { getDataFromTransaction, bytesBuffer, bytes32Buffer } from "../scripts/utils";
+
 
 export async function getTransactionFee(provider: anchor.AnchorProvider, txSignature: string) {
   // Fetch the transaction to get the exact fee (with retry logic)
@@ -80,8 +82,8 @@ export async function depositSol(
   provider: anchor.AnchorProvider,
   program: Program<Payment>,
   payerKeypair: Keypair,
-  account: number[],
-  sn: number[],
+  account: string,
+  sn: string,
   amount: anchor.BN,
   frozen: anchor.BN,
   expiredAt: anchor.BN
@@ -94,8 +96,8 @@ export async function depositTokens(
   program: Program<Payment>,
   payerKeypair: Keypair,
   mint: PublicKey,
-  account: number[],
-  sn: number[],
+  account: string,
+  sn: string,
   amount: anchor.BN,
   frozen: anchor.BN,
   expiredAt: anchor.BN
@@ -110,13 +112,15 @@ export async function depositWithMessage(
   payerKeypair: Keypair,
   signerKeypair: Keypair,
   mint: PublicKey,
-  account: number[],
-  sn: number[],
+  account: string,
+  sn: string,
   amount: anchor.BN,
   frozen: anchor.BN,
   expiredAt: anchor.BN,
   message: Buffer = null
 ) {
+  const accountBuffer = bytes32Buffer(account);
+  const snBuffer = bytes32Buffer(sn);
   // Derive the payment state account PDA
   const [paymentStatePDA] = PublicKey.findProgramAddressSync(
     [Buffer.from("payment-state")],
@@ -125,7 +129,7 @@ export async function depositWithMessage(
 
   // Derive the user token account PDA
   const [userAccountPDA] = PublicKey.findProgramAddressSync(
-    [Buffer.from("user-token"), Buffer.from(account), mint.toBuffer()],
+    [Buffer.from("user-token"), accountBuffer, mint.toBuffer()],
     program.programId
   );
 
@@ -137,7 +141,7 @@ export async function depositWithMessage(
 
   // Derive the record account PDA
   const [recordPubkey] = PublicKey.findProgramAddressSync(
-    [Buffer.from("record"), Buffer.from(sn)],
+    [Buffer.from("record"), snBuffer],
     program.programId
   );
 
@@ -163,15 +167,17 @@ export async function depositWithMessage(
   if (message == null) {
     // Create and sign the message
     message = Buffer.concat([
-      Buffer.from(account),
+      accountBuffer,
       amount.toArrayLike(Buffer, 'le', 8),
       frozen.toArrayLike(Buffer, 'le', 8),
-      Buffer.from(sn),
+      snBuffer,
       expiredAt.toArrayLike(Buffer, 'le', 8)
     ]);
   }
-
+  console.log("SN before signing:", snBuffer.toString('hex')); // Log before signing
   const signature = signMessageForEd25519(message, signerKeypair);
+  console.log("Message for signing:", message.toString('hex'));
+
   try {
     const ed25519Instruction = Ed25519Program.createInstructionWithPublicKey({
       publicKey: signerKeypair.publicKey.toBytes(),
@@ -179,8 +185,9 @@ export async function depositWithMessage(
       signature: signature,
     });
     
+    console.log('input parameters: ',  {token: mint, account:accountBuffer, amount: amount.toString(), frozen: frozen.toString(), sn: snBuffer, expiredAt, signature});
     const tx = await program.methods
-    .deposit(account, amount, frozen, sn, expiredAt, signature)
+    .deposit(accountBuffer, amount, frozen, snBuffer, expiredAt, signature)
     .accounts({
       paymentState: paymentStatePDA,
       userTokenAccount: userAccountPDA,
@@ -205,7 +212,24 @@ export async function depositWithMessage(
       console.error("Transaction failed:", txResult.value.err);
       throw new Error("Transaction failed");
     }
-
+    // Fetch the transaction details to get the events
+    const txDetails = await provider.connection.getTransaction(tx, { commitment: 'confirmed' });
+    console.log("DepositEvent txDetails:", JSON.stringify(txDetails));
+    const programDataLog = getDataFromTransaction(txDetails, program.programId.toBase58(), 'Deposit');
+    console.log('programDataLog:', programDataLog);
+    const dataBuffer = Buffer.from(programDataLog, 'base64');
+    console.log("Raw dataBuffer:", dataBuffer);
+    console.log("SN after signing:", snBuffer.toString('hex')); // Log after signing
+    // Assuming the structure of DepositEvent is known, parse it
+    const depositEvent = {
+      sn: dataBuffer.slice(8, 40), // First 32 bytes for sn
+      account: dataBuffer.slice(40, 72), // Next 32 bytes for account
+      token: new PublicKey(dataBuffer.slice(72, 104)), // Next 32 bytes for token
+      amount: dataBuffer.readBigUInt64LE(104), // Adjusted offset for amount
+      frozen: dataBuffer.readBigUInt64LE(112), // Adjusted offset for frozen
+    };
+    console.log("Parsed DepositEvent:", depositEvent);
+    console.log("Parsed DepositEvent SN:", depositEvent.sn.toString('hex')); // Log parsed SN
     const programTokenAccountAfter = await getAccountBalance(provider.connection, mint, programTokenPDA);
     console.log("Program token account after deposit:", programTokenAccountAfter);
 
@@ -248,8 +272,8 @@ export async function deposit(
   payerKeypair: Keypair,
   signerKeypair: Keypair,
   mint: PublicKey,
-  account: number[],
-  sn: number[],
+  account: string,
+  sn: string,
   amount: anchor.BN,
   frozen: anchor.BN,
   expiredAt: anchor.BN,
@@ -263,13 +287,16 @@ export async function withdraw(
   payerKeypair: Keypair,
   signerKeypair: Keypair,
   mint: PublicKey,
-  account: number[],
+  account: string,
   to: PublicKey,
-  sn: number[],
+  sn: string,
   available: anchor.BN,
   frozen: anchor.BN,
   expiredAt: anchor.BN
 ) {
+  const accountBuffer = bytes32Buffer(account);
+  const snBuffer = bytes32Buffer(sn);
+
   // Derive the payment state account PDA
   const [paymentStatePDA] = PublicKey.findProgramAddressSync(
     [Buffer.from("payment-state")],
@@ -289,8 +316,9 @@ export async function withdraw(
   );
 
   // Derive the record account PDA
+  // todo [Buffer.from("record"), Buffer.from(withdrawSN.slice(0, 26))], // Adjusted to fit within 32 bytes
   const [recordPubkey] = PublicKey.findProgramAddressSync(
-    [Buffer.from("record"), Buffer.from(sn)],
+    [Buffer.from("record"), snBuffer],
     program.programId
   );
 
@@ -309,10 +337,10 @@ export async function withdraw(
 
   // Create and sign the message
   const message = Buffer.concat([
-    Buffer.from(account),
+    accountBuffer,
     available.toArrayLike(Buffer, 'le', 8),
     frozen.toArrayLike(Buffer, 'le', 8),
-    Buffer.from(sn),
+    snBuffer,
     expiredAt.toArrayLike(Buffer, 'le', 8)
   ]);
 
@@ -324,7 +352,7 @@ export async function withdraw(
       signature: signature,
     });
     const tx = await program.methods
-      .withdraw(account, available, frozen, sn, expiredAt, signature)
+      .withdraw(accountBuffer, available, frozen, snBuffer, expiredAt, signature)
       .accounts({
         paymentState: paymentStatePDA,
         userTokenAccount: userAccountPDA,
