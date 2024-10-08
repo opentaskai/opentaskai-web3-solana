@@ -14,8 +14,8 @@ import {
 import * as secp256k1 from 'secp256k1';
 import { keccak256 } from 'js-sha3';
 import { getTokenAccountBalance, getAccountBalance } from "../scripts/tokens";
-import { getDataFromTransaction, bytesBuffer, bytes32Buffer } from "../scripts/utils";
-
+import { parseEventFromTransaction, bytesBuffer, bytes32Buffer } from "../scripts/utils";
+import assert from "assert";
 
 export async function getTransactionFee(provider: anchor.AnchorProvider, txSignature: string) {
   // Fetch the transaction to get the exact fee (with retry logic)
@@ -185,7 +185,7 @@ export async function depositWithMessage(
       signature: signature,
     });
     
-    console.log('input parameters: ',  {token: mint, account:accountBuffer, amount: amount.toString(), frozen: frozen.toString(), sn: snBuffer, expiredAt, signature});
+    console.log('input parameters: ',  {user: payerKeypair.publicKey.toBase58(), token: mint, account:accountBuffer, amount: amount.toString(), frozen: frozen.toString(), sn: snBuffer, expiredAt, signature});
     const tx = await program.methods
     .deposit(accountBuffer, amount, frozen, snBuffer, expiredAt, signature)
     .accounts({
@@ -212,24 +212,20 @@ export async function depositWithMessage(
       console.error("Transaction failed:", txResult.value.err);
       throw new Error("Transaction failed");
     }
+    console.log("SN bytes32:", snBuffer.toString('hex')); // Log after signing
     // Fetch the transaction details to get the events
     const txDetails = await provider.connection.getTransaction(tx, { commitment: 'confirmed' });
-    console.log("DepositEvent txDetails:", JSON.stringify(txDetails));
-    const programDataLog = getDataFromTransaction(txDetails, program.programId.toBase58(), 'Deposit');
-    console.log('programDataLog:', programDataLog);
-    const dataBuffer = Buffer.from(programDataLog, 'base64');
-    console.log("Raw dataBuffer:", dataBuffer);
-    console.log("SN after signing:", snBuffer.toString('hex')); // Log after signing
-    // Assuming the structure of DepositEvent is known, parse it
-    const depositEvent = {
-      sn: dataBuffer.slice(8, 40), // First 32 bytes for sn
-      account: dataBuffer.slice(40, 72), // Next 32 bytes for account
-      token: new PublicKey(dataBuffer.slice(72, 104)), // Next 32 bytes for token
-      amount: dataBuffer.readBigUInt64LE(104), // Adjusted offset for amount
-      frozen: dataBuffer.readBigUInt64LE(112), // Adjusted offset for frozen
-    };
+    // console.log("DepositEvent txDetails:", JSON.stringify(txDetails));
+    const depositEvent = parseEventFromTransaction(txDetails, program.programId.toBase58(), 'Deposit');
     console.log("Parsed DepositEvent:", depositEvent);
     console.log("Parsed DepositEvent SN:", depositEvent.sn.toString('hex')); // Log parsed SN
+    console.log("Parsed DepositEvent user:", depositEvent.user.toBase58()); // Log parsed user
+    
+    assert.strictEqual(amount.toString(), depositEvent.amount.toString(), "amount doesn't match");
+    assert.strictEqual(frozen.toString(), depositEvent.frozen.toString(), "frozen doesn't match");
+    assert.strictEqual(snBuffer.toString('hex'), depositEvent.sn.toString('hex'), "sn doesn't match");
+    assert.strictEqual(payerKeypair.publicKey.toBase58(), depositEvent.user.toBase58(), "user doesn't match");
+    
     const programTokenAccountAfter = await getAccountBalance(provider.connection, mint, programTokenPDA);
     console.log("Program token account after deposit:", programTokenAccountAfter);
 
@@ -305,7 +301,7 @@ export async function withdraw(
 
   // Derive the user token account PDA
   const [userAccountPDA] = PublicKey.findProgramAddressSync(
-    [Buffer.from("user-token"), Buffer.from(account), mint.toBuffer()],
+    [Buffer.from("user-token"), accountBuffer, mint.toBuffer()],
     program.programId
   );
 
@@ -321,6 +317,8 @@ export async function withdraw(
     [Buffer.from("record"), snBuffer],
     program.programId
   );
+
+  console.log('withdraw recordPubkey:', recordPubkey);
 
   let tokenAccount = payerKeypair.publicKey;
   if (mint.toBase58() !== "So11111111111111111111111111111111111111112") {
@@ -351,6 +349,8 @@ export async function withdraw(
       message: message,
       signature: signature,
     });
+
+    console.log('input parameters: ',  {user: payerKeypair.publicKey.toBase58(), token: mint, account:accountBuffer, available: available.toString(), frozen: frozen.toString(), sn: snBuffer, expiredAt, signature});
     const tx = await program.methods
       .withdraw(accountBuffer, available, frozen, snBuffer, expiredAt, signature)
       .accounts({
@@ -378,6 +378,19 @@ export async function withdraw(
       console.error("Transaction failed:", txResult.value.err);
       throw new Error("Transaction failed");
     }
+    console.log("SN bytes32:", snBuffer.toString('hex')); // Log after signing
+    // Fetch the transaction details to get the events
+    const txDetails = await provider.connection.getTransaction(tx, { commitment: 'confirmed' });
+    // console.log("WithdrawEvent txDetails:", JSON.stringify(txDetails));
+    const withdrawEvent = parseEventFromTransaction(txDetails, program.programId.toBase58(), 'Withdraw');
+    console.log("Parsed WithdrawEvent:", withdrawEvent);
+    console.log("Parsed WithdrawEvent SN:", withdrawEvent.sn.toString('hex')); // Log parsed SN
+    
+    assert.strictEqual(available.toString(), withdrawEvent.available.toString(), "available doesn't match");
+    assert.strictEqual(frozen.toString(), withdrawEvent.frozen.toString(), "frozen doesn't match");
+    assert.strictEqual(snBuffer.toString('hex'), withdrawEvent.sn.toString('hex'), "sn doesn't match");
+    assert.strictEqual(payerKeypair.publicKey.toBase58(), withdrawEvent.user.toBase58(), "user doesn't match");
+
     return tx;
   } catch (error) {
     console.error("Withdraw Token Error details:", error);

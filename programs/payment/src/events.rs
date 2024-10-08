@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-// #[derive(Debug)]
+#[derive(Debug)]
 #[event]
 pub struct DepositEvent {
     pub sn: [u8; 32],
@@ -8,6 +8,7 @@ pub struct DepositEvent {
     pub token: Pubkey,
     pub amount: u64,
     pub frozen: u64,
+    pub user: Pubkey,
 }
 
 #[event]

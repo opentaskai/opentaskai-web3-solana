@@ -766,6 +766,10 @@ export type Payment = {
           {
             "name": "frozen",
             "type": "u64"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
           }
         ]
       }

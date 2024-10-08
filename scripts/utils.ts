@@ -1,5 +1,5 @@
 
-import { Connection, Keypair } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { v4 } from 'uuid';
 
 export async function identifySolanaNetwork(connection: Connection): Promise<string> {
@@ -48,15 +48,57 @@ export async function airdrop(payerKeypair: Keypair, connection: Connection, amo
 }
 
 export function getDataFromTransaction(tx: any, programId: string, instruction: string) {
+  // Verify that the transaction includes an instruction with your program ID
+  const isProgramIdPresent = tx.transaction.message.instructions.some(instruction => {
+    const programIdIndex = instruction.programIdIndex;
+    const _programId = tx.transaction.message.accountKeys[programIdIndex];
+    // console.log('check program id:', _programId.toBase58(), programId);
+    return _programId.toBase58() === programId;
+  });
+
+  if (!isProgramIdPresent) {
+    throw new Error("Transaction does not include the expected program ID");
+  }
+
   if(tx && tx.meta && tx.meta.logMessages) {
-    const findProgram = tx.meta.logMessages.find(log => log === `Program ${programId} success`);
+    const findProgram = tx.meta.logMessages[tx.meta.logMessages.length-1] === `Program ${programId} success`;
     const findInstruction = tx.meta.logMessages.find(log => log === 'Program log: Instruction: '+ instruction);
     if(findProgram && findInstruction) {
       const programDataLog = tx.meta.logMessages.find(log => log.startsWith("Program data:"));
       return programDataLog.split("Program data: ")[1];
     }
   }
-  return null;
+  throw new Error('not found program data');
+}
+
+export function parseEventFromTransaction(tx: any, programId: string, instruction: string) {
+  // console.log('tx:', JSON.stringify(tx));
+  const programDataLog = getDataFromTransaction(tx, programId, instruction);
+  // console.log('programDataLog:', programDataLog);
+  const dataBuffer = Buffer.from(programDataLog, 'base64');
+  // console.log("Raw dataBuffer:", dataBuffer);
+  if (instruction === 'Deposit') {
+    return {
+      sn: dataBuffer.slice(8, 40), // First 32 bytes for sn
+      account: dataBuffer.slice(40, 72), // Next 32 bytes for account
+      token: new PublicKey(dataBuffer.slice(72, 104)), // Next 32 bytes for token
+      amount: dataBuffer.readBigUInt64LE(104), // Adjusted offset for amount
+      frozen: dataBuffer.readBigUInt64LE(112), // Adjusted offset for frozen
+      user: new PublicKey(dataBuffer.slice(120, 152)), // Next 32 bytes for user
+    };
+  } else if (instruction === 'Withdraw') {
+    return {
+      sn: dataBuffer.slice(8, 40), // First 32 bytes for sn
+      token: new PublicKey(dataBuffer.slice(40, 72)), // Next 32 bytes for token
+      from: dataBuffer.slice(72, 104), // Next 32 bytes for from account
+      to: new PublicKey(dataBuffer.slice(104, 136)), // Next 32 bytes for token
+      available: dataBuffer.readBigUInt64LE(136), // Adjusted offset for available
+      frozen: dataBuffer.readBigUInt64LE(144), // Adjusted offset for frozen
+      user: new PublicKey(dataBuffer.slice(152, 184)), // Next 32 bytes for user
+    };
+  } else {
+    return null;
+  }
 }
 
 export function uuid(){
@@ -76,7 +118,7 @@ export function bytes32Buffer(snHex: string|number) {
   if(len > 0) {
     res = Buffer.concat([Buffer.alloc(len), snBytes]); // Pad with 16 zeros at the beginning
   }
-  console.log('snHex, snBytes, bytes32Buffer:', snHex, snBytes, res);
+  // console.log('snHex, snBytes, bytes32Buffer:', snHex, snBytes, res);
   return res;
 }
 

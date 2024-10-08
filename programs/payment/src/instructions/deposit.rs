@@ -50,7 +50,7 @@ pub fn handler(
         user_token_account.mint = ctx.accounts.mint.key();
     }
 
-    // msg!("Emitting DepositEvent: {:?}", DepositEvent { sn, account, token: ctx.accounts.mint.key(), amount, frozen });
+    msg!("Emitting DepositEvent: {:?}", DepositEvent { sn, account, token: ctx.accounts.mint.key(), amount, frozen, user: ctx.accounts.user.key() });
     // Emit the deposit event
     emit!(DepositEvent {
         sn,
@@ -58,6 +58,7 @@ pub fn handler(
         token: ctx.accounts.mint.key(),
         amount,
         frozen,
+        user: ctx.accounts.user.key(),
     });
 
     Ok(())
