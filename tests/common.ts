@@ -404,3 +404,23 @@ export async function withdraw(
     throw error;
   }
 }
+
+export async function checkTransactionExecuted(provider: anchor.AnchorProvider, program: Program<Payment>, sn: string) {
+  // Derive the PDA for the TransactionRecord
+  const [transactionRecordPDA] = PublicKey.findProgramAddressSync(
+    [Buffer.from("record"), bytes32Buffer(sn)],
+    program.programId
+  );
+
+  // Fetch the TransactionRecord account
+  try {
+    const transactionRecord = await program.account.transactionRecord.fetch(transactionRecordPDA);
+    console.log('transactionRecord:', transactionRecord);
+    // Check if the transaction has been executed
+    return transactionRecord.executed;
+  } catch(e: any) {
+    console.log('transactionRecord except:', e.message);
+    if (e.message.indexOf('Account does not exist or has no data') != -1) return false;
+    throw e;
+  } 
+}

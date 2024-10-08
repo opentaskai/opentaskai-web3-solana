@@ -15,7 +15,7 @@ import {
   SystemProgram,
 } from "@solana/web3.js";
 
-import { depositWithMessage, depositSol, depositTokens, showUserTokenAccount, getTransactionFee, withdraw } from "./common";
+import { depositWithMessage, depositSol, depositTokens, showUserTokenAccount, getTransactionFee, withdraw, checkTransactionExecuted } from "./common";
 import { deployToken, getTokenAccountBalance, getAccountBalance } from "../scripts/tokens";
 import { airdrop, uuid, bytes32Buffer, bufferToArray } from "../scripts/utils";
 import { loadKeypair } from "../scripts/accounts";
@@ -541,6 +541,13 @@ describe("payment", () => {
       program.programId
     );
 
+    let isExecute = await checkTransactionExecuted(provider, program, withdrawSN);
+    assert.strictEqual(
+      isExecute,
+      false,
+      "sn should be not executed"
+    );
+
     // Create and sign the message
     const message = Buffer.concat([
       bytes32Buffer(account),
@@ -634,6 +641,13 @@ describe("payment", () => {
       totalBalanceAfter.sub(totalBalanceBefore).toString(),
       expectedTotalBalanceChange.toString(),
       "Total balance change is incorrect after withdraw"
+    );
+
+    isExecute = await checkTransactionExecuted(provider, program, withdrawSN);
+    assert.strictEqual(
+      isExecute,
+      true,
+      "sn should be executed"
     );
   });
   
