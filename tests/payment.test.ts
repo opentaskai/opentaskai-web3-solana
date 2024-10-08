@@ -336,6 +336,25 @@ describe("payment", () => {
       expectedBalance.toString(),
       `Program SOL balance is incorrect. Expected ${expectedBalance}, got ${programTokenAccountAfter}`
     );
+
+    // fail to test the same sn
+    try {
+      await depositSol(
+        provider,
+        program,
+        payerKeypair,
+        account,
+        sn,
+        amount,
+        frozen,
+        expiredAt
+      );
+      assert.fail("Expected an error but the transaction succeeded");
+    } catch (error) {
+      assert.ok(error instanceof anchor.AnchorError);
+      // console.log('error.error:', error.error);
+      assert.strictEqual(error.error.errorCode.code, "AlreadyExecuted");
+    }
   });
 
   it("Deposits tokens", async () => {
@@ -560,7 +579,7 @@ describe("payment", () => {
     const signature = nacl.sign.detached(message, payerKeypair.secretKey);
     console.log("Signature:", Buffer.from(signature).toString('hex'));
 
-    const tx =await withdraw(
+    const tx = await withdraw(
       provider,
       program,
       payerKeypair,
@@ -649,6 +668,28 @@ describe("payment", () => {
       true,
       "sn should be executed"
     );
+
+    // fail to test the same sn
+    try {
+      await withdraw(
+        provider,
+        program,
+        payerKeypair,
+        payerKeypair,
+        mint,
+        account,
+        userTokenAccount,
+        withdrawSN,
+        withdrawAvailable,
+        withdrawFrozen, 
+        expiredAt
+      );
+      assert.fail("Expected an error but the transaction succeeded");
+    } catch (error) {
+      assert.ok(error instanceof anchor.AnchorError);
+      // console.log('error.error:', error.error);
+      assert.strictEqual(error.error.errorCode.code, "AlreadyExecuted");
+    }
   });
   
 });

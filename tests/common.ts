@@ -53,7 +53,7 @@ export async function showUserTokenAccount(
 
 export function signMessageForEd25519(message: Buffer, signerKeypair: Keypair) {
   const signature = nacl.sign.detached(message, signerKeypair.secretKey);
-  console.log("Signature:", signature);
+  // console.log("Signature:", signature);
   return signature;
 }
 
@@ -185,7 +185,7 @@ export async function depositWithMessage(
       signature: signature,
     });
     
-    console.log('input parameters: ',  {user: payerKeypair.publicKey.toBase58(), token: mint, account:accountBuffer, amount: amount.toString(), frozen: frozen.toString(), sn: snBuffer, expiredAt, signature});
+    // console.log('input parameters: ',  {user: payerKeypair.publicKey.toBase58(), token: mint, account:accountBuffer, amount: amount.toString(), frozen: frozen.toString(), sn: snBuffer, expiredAt, signature});
     const tx = await program.methods
     .deposit(accountBuffer, amount, frozen, snBuffer, expiredAt, signature)
     .accounts({
@@ -350,7 +350,7 @@ export async function withdraw(
       signature: signature,
     });
 
-    console.log('input parameters: ',  {user: payerKeypair.publicKey.toBase58(), token: mint, account:accountBuffer, available: available.toString(), frozen: frozen.toString(), sn: snBuffer, expiredAt, signature});
+    // console.log('input parameters: ',  {user: payerKeypair.publicKey.toBase58(), token: mint, account:accountBuffer, available: available.toString(), frozen: frozen.toString(), sn: snBuffer, expiredAt, signature});
     const tx = await program.methods
       .withdraw(accountBuffer, available, frozen, snBuffer, expiredAt, signature)
       .accounts({
