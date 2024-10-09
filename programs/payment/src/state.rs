@@ -37,3 +37,31 @@ pub struct TransactionRecord {
 impl TransactionRecord {
     pub const LEN: usize = 1;
 }
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct TransferData {
+    pub from: [u8; 32], // Sender's account number.
+    pub to: [u8; 32], // Recipient's account number
+    pub available: u64, // Amount deducted from sender's available balance
+    pub frozen: u64, // Amount deducted from sender's frozen balance
+    pub amount: u64, // Amount transferred to recipient's account
+    pub fee: u64, // Base fee for the transaction transferred to the fee account
+    pub paid: u64, // Total amount paid by the sender, potentially including excess payment, which is frozen in the sender's account
+    pub excess_fee: u64, // Additional fee charged if 'paid' exceeds 'frozen', transferred to the fee account
+}
+
+impl TransferData {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        [
+            &self.from[..],
+            &self.to[..],
+            &self.available.to_le_bytes(),
+            &self.frozen.to_le_bytes(),
+            &self.amount.to_le_bytes(),
+            &self.fee.to_le_bytes(),
+            &self.paid.to_le_bytes(),
+            &self.excess_fee.to_le_bytes(),
+        ]
+        .concat()
+    }
+}

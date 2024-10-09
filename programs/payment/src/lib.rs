@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token};
 use anchor_spl::associated_token::AssociatedToken;
-use crate::state::{PaymentState, UserTokenAccount, TransactionRecord};
+use crate::state::{PaymentState, UserTokenAccount, TransactionRecord, TransferData};
 
 declare_id!("7mEtBse9oundTRfuYNTmPBaYr1gGNM5sewKDo23meJXe");
 
@@ -56,6 +56,40 @@ pub mod payment {
     ) -> Result<()> {
         withdraw::handler(ctx, from, available, frozen, sn, expired_at, signature)
     }
+
+    pub fn freeze(
+        ctx: Context<Freeze>,
+        account: [u8; 32],
+        amount: u64,
+        sn: [u8; 32],
+        expired_at: i64,
+        signature: [u8; 64],
+    ) -> Result<()> {
+        freeze::handler(ctx, account, amount, sn, expired_at, signature)
+    }
+
+    pub fn unfreeze(
+        ctx: Context<Unfreeze>,
+        account: [u8; 32],
+        amount: u64,
+        fee: u64,
+        sn: [u8; 32],
+        expired_at: i64,
+        signature: [u8; 64],
+    ) -> Result<()> {
+        unfreeze::handler(ctx, account, amount, fee, sn, expired_at, signature)
+    }
+
+    pub fn transfer(
+        ctx: Context<Transfer>,
+        out: Pubkey,
+        deal: TransferData,
+        sn: [u8; 32],
+        expired_at: i64,
+        signature: [u8; 64],
+    ) -> Result<()> {
+        transfer::handler(ctx, out, deal, sn, expired_at, signature)
+    }
 }
 
 #[derive(Accounts)]
@@ -91,6 +125,16 @@ pub struct InitializeProgramToken<'info> {
     )]
     /// CHECK: This account is initialized in the instruction handler
     pub program_token: UncheckedAccount<'info>,
+    #[account(
+        init_if_needed,
+        payer = owner,
+        seeds = [b"user-token", payment_state.fee_to_account.as_ref(), mint.key().as_ref()],
+        bump,
+        space = if *mint.key == anchor_spl::token::spl_token::native_mint::id() { 0 } else { 165 },
+        owner = if *mint.key == anchor_spl::token::spl_token::native_mint::id() { system_program.key() } else { token_program.key() }
+    )]
+    /// CHECK: This account is initialized in the instruction handler
+    pub fee_token_account: UncheckedAccount<'info>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
@@ -110,7 +154,7 @@ pub struct ChangeOwner<'info> {
 pub struct Withdraw<'info> {
     #[account(mut, seeds = [b"payment-state"], bump)]
     pub payment_state: Account<'info, PaymentState>,
-        #[account(
+    #[account(
         init_if_needed,
         payer = user,
         space = 8 + UserTokenAccount::LEN,
@@ -151,6 +195,113 @@ pub struct Withdraw<'info> {
     pub instruction_sysvar: AccountInfo<'info>,
     pub rent: Sysvar<'info, Rent>,
 }
+
+#[derive(Accounts)]
+#[instruction(from: [u8; 32], available: u64, frozen: u64, sn: [u8; 32], expired_at: i64)]
+pub struct Unfreeze<'info> {
+    #[account(mut, seeds = [b"payment-state"], bump)]
+    pub payment_state: Account<'info, PaymentState>,
+    #[account(
+        init_if_needed,
+        payer = user,
+        space = 8 + UserTokenAccount::LEN,
+        seeds = [b"user-token", from.as_ref(), mint.key().as_ref()],
+        bump
+    )]
+    pub user_token_account: Account<'info, UserTokenAccount>,
+    #[account(
+        mut,
+        seeds = [b"user-token", payment_state.fee_to_account.as_ref(), mint.key().as_ref()],
+        bump
+    )]
+    pub fee_token_account: Account<'info, UserTokenAccount>,
+    #[account(mut)]
+    pub user: Signer<'info>,
+    /// CHECK: This account is checked in the instruction handler
+    pub mint: UncheckedAccount<'info>,
+    /// CHECK: This account is checked in the instruction
+    #[account(mut)]
+    pub user_token: UncheckedAccount<'info>,
+    /// CHECK: This is the token account that we want to transfer to
+    #[account(
+        mut,
+        seeds = [b"program-token", mint.key().as_ref()],
+        bump,
+        owner = if *mint.key == anchor_spl::token::spl_token::native_mint::id() { system_program.key() } else { token_program.key() }
+    )]
+    pub program_token: UncheckedAccount<'info>,
+    #[account(
+        init_if_needed,
+        payer = user,
+        space = 8 + TransactionRecord::LEN,
+        seeds = [b"record", sn.as_ref()],
+        bump
+    )]
+    pub record: Account<'info, TransactionRecord>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    /// CHECK: This account is used to verify the Ed25519 instruction
+    pub instruction_sysvar: AccountInfo<'info>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
+
+#[derive(Accounts)]
+#[instruction(from: [u8; 32], to: [u8; 32], available: u64, frozen: u64, sn: [u8; 32], expired_at: i64)]
+pub struct Transfer<'info> {
+    #[account(mut, seeds = [b"payment-state"], bump)]
+    pub payment_state: Account<'info, PaymentState>,
+    #[account(
+        init_if_needed,
+        payer = user,
+        space = 8 + UserTokenAccount::LEN,
+        seeds = [b"user-token", from.as_ref(), mint.key().as_ref()],
+        bump
+    )]
+    pub from_token_account: Account<'info, UserTokenAccount>,
+    #[account(
+        init_if_needed,
+        payer = user,
+        space = 8 + UserTokenAccount::LEN,
+        seeds = [b"user-token", to.as_ref(), mint.key().as_ref()],
+        bump
+    )]
+    pub to_token_account: Account<'info, UserTokenAccount>,
+    #[account(mut)]
+    pub user: Signer<'info>,
+    /// CHECK: This account is checked in the instruction handler
+    pub mint: UncheckedAccount<'info>,
+    /// CHECK: This account is checked in the instruction
+    #[account(mut)]
+    pub out: UncheckedAccount<'info>,
+    /// CHECK: This is the token account that we want to transfer from
+    #[account(mut)]
+    pub user_token: UncheckedAccount<'info>,
+    /// CHECK: This is the token account that we want to transfer to
+    #[account(
+        mut,
+        seeds = [b"program-token", mint.key().as_ref()],
+        bump,
+        owner = if *mint.key == anchor_spl::token::spl_token::native_mint::id() { system_program.key() } else { token_program.key() }
+    )]
+    pub program_token: UncheckedAccount<'info>,
+    #[account(
+        init_if_needed,
+        payer = user,
+        space = 8 + TransactionRecord::LEN,
+        seeds = [b"record", sn.as_ref()],
+        bump
+    )]
+    pub record: Account<'info, TransactionRecord>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    /// CHECK: This account is used to verify the Ed25519 instruction
+    pub instruction_sysvar: AccountInfo<'info>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
 
 macro_rules! define_account_struct {
     ($name:ident, $instruction:meta, $account:ident, $sn:ident, $($extra_field:tt)*) => {
@@ -204,4 +355,3 @@ macro_rules! define_account_struct {
 // Use the macro to define the structs with different instructions
 define_account_struct!(Deposit, instruction(account: [u8; 32], amount: u64, frozen: u64, sn: [u8; 32], expired_at: i64), account, sn,);
 define_account_struct!(Freeze, instruction(account: [u8; 32], amount: u64, sn: [u8; 32], expired_at: i64), account, sn,);
-define_account_struct!(Unfreeze, instruction(account: [u8; 32], amount: u64, fee: u64, sn: [u8; 32], expired_at: i64), account, sn,);

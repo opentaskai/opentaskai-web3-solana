@@ -23,6 +23,23 @@ pub fn initialize_program_token(ctx: Context<InitializeProgramToken>) -> Result<
                 &[ctx.bumps.program_token],
             ]],
         ))?;
+
+        // Manually initialize the fee token account
+        token::initialize_account(CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            InitializeAccount {
+                account: ctx.accounts.fee_token_account.to_account_info(),
+                mint: ctx.accounts.mint.to_account_info(),
+                authority: ctx.accounts.payment_state.to_account_info(),
+                rent: ctx.accounts.rent.to_account_info(),
+            },
+            &[&[
+                b"user-token",
+                ctx.accounts.payment_state.fee_to_account.as_ref(),
+                ctx.accounts.mint.key().as_ref(),
+                &[ctx.bumps.fee_token_account],
+            ]],
+        ))?;
     }
     Ok(())
 }

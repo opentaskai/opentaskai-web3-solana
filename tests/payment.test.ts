@@ -36,15 +36,20 @@ describe("payment", () => {
   let mint: PublicKey;
   let userTokenAccount: PublicKey;
   let programTokenPDA: PublicKey;
+  let programSolPDA: PublicKey;
+  let feeTokenPDA: PublicKey;
+  let feeSolPDA: PublicKey;
   let paymentStatePDA: PublicKey;
-  let programSolAccount: PublicKey;
+  
 
   const expiredAt = new anchor.BN(new Date().getTime() / 1000 + 1000000000);
 
   // Define constants at the beginning of the describe block
-  const PAYMENT_STATE_ACCOUNT_FILL = Buffer.alloc(32).fill(1).toString('hex');
+  const FEE_ACCOUNT_FILL = Buffer.alloc(32).fill(1).toString('hex');
   const SOL_DEPOSIT_ACCOUNT_FILL = Buffer.alloc(32).fill(2).toString('hex');
-  const TOKEN_DEPOSIT_ACCOUNT_FILL = Buffer.alloc(32).fill(3).toString('hex')
+  const TOKEN_DEPOSIT_ACCOUNT_FILL = Buffer.alloc(32).fill(3).toString('hex');
+
+  const feeAccountBuffer = bytes32Buffer(FEE_ACCOUNT_FILL);
 
   before(async () => {
     // Request airdrop for the payer
@@ -90,8 +95,21 @@ describe("payment", () => {
       program.programId
     );
 
-    [programSolAccount] = PublicKey.findProgramAddressSync(
+    [programSolPDA] = PublicKey.findProgramAddressSync(
       [Buffer.from("program-token"), spl.NATIVE_MINT.toBuffer()],
+      program.programId
+    );
+
+    // Derive the fee token account PDA
+    [feeTokenPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user-token"), feeAccountBuffer, mint.toBuffer()],
+      program.programId
+    );
+    
+    console.log('feeTokenPDA:', feeTokenPDA);
+
+    [feeSolPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user-token"), feeAccountBuffer, spl.NATIVE_MINT.toBuffer()],
       program.programId
     );
 
@@ -132,10 +150,11 @@ describe("payment", () => {
       "Payment state should be enabled"
     );
 
+    console.log('feeAccountBuffer:', feeAccountBuffer);
     console.log('paymentStateAccount.feeToAccount:', paymentStateAccount.feeToAccount);
     assert.deepStrictEqual(
       paymentStateAccount.feeToAccount,
-      bufferToArray(bytes32Buffer(PAYMENT_STATE_ACCOUNT_FILL)),
+      bufferToArray(bytes32Buffer(FEE_ACCOUNT_FILL)),
       "Fee to account doesn't match"
     );
   });
@@ -152,6 +171,7 @@ describe("payment", () => {
           owner: payerKeypair.publicKey,
           mint: mint,
           programToken: programTokenPDA,
+          feeTokenAccount: feeTokenPDA,
           tokenProgram: spl.TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
@@ -168,13 +188,19 @@ describe("payment", () => {
       assert.strictEqual(programTokenAccount.owner.toBase58(), paymentStatePDA.toBase58(), "Program token account owner doesn't match");
       assert.strictEqual(programTokenAccount.amount.toString(), "0", "Program token account should have 0 balance initially");
 
+      const feeTokenAccount = await spl.getAccount(provider.connection, feeTokenPDA);
+      console.log('feeTokenAccount:', feeTokenAccount);
+      assert(feeTokenAccount !== null, "fee token account should exist");
+      assert.strictEqual(feeTokenAccount.mint.toBase58(), mint.toBase58(), "fee token account mint doesn't match");
+      assert.strictEqual(feeTokenAccount.owner.toBase58(), paymentStatePDA.toBase58(), "fee token account owner doesn't match");
+      assert.strictEqual(feeTokenAccount.amount.toString(), "0", "fee token account should have 0 balance initially");
     } catch (error) {
       console.error("Error initializing SPL program token:", error);
       throw error;
     }
 
-    accountInfo = await provider.connection.getAccountInfo(programSolAccount);
-    console.log("programSolAccount accountInfo:", accountInfo);
+    accountInfo = await provider.connection.getAccountInfo(programSolPDA);
+    console.log("programSolPDA accountInfo:", accountInfo);
     // Initialize SOL token
     try {
       const tx = await program.methods
@@ -183,7 +209,8 @@ describe("payment", () => {
           paymentState: paymentStatePDA,
           owner: payerKeypair.publicKey,
           mint: spl.NATIVE_MINT,
-          programToken: programSolAccount,
+          programToken: programSolPDA,
+          feeTokenAccount: feeSolPDA,
           tokenProgram: spl.TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
@@ -194,11 +221,16 @@ describe("payment", () => {
       console.log("SOL Program token initialized. Transaction signature:", tx);
 
       // Verify the initialization
-      const programSolAccountInfo = await provider.connection.getAccountInfo(programSolAccount);
-      assert(programSolAccountInfo !== null, "Program SOL account should exist");
-      assert(programSolAccountInfo.owner.equals(SystemProgram.programId), "Program SOL account should be owned by the System Program");
-      assert(programSolAccountInfo.lamports > 0, "Program SOL account should have some balance");
-
+      const programSolPDAInfo = await provider.connection.getAccountInfo(programSolPDA);
+      assert(programSolPDAInfo !== null, "Program SOL account should exist");
+      assert(programSolPDAInfo.owner.equals(SystemProgram.programId), "Program SOL account should be owned by the System Program");
+      assert(programSolPDAInfo.lamports > 0, "Program SOL account should have some balance");
+      
+      const feeSolPDAInfo = await provider.connection.getAccountInfo(feeSolPDA);
+      console.log('feeSolPDAInfo:', feeSolPDAInfo);
+      assert(feeSolPDAInfo !== null, "fee SOL account should exist");
+      assert(feeSolPDAInfo.owner.equals(SystemProgram.programId), "fee SOL account should be owned by the System Program");
+      assert(feeSolPDAInfo.lamports > 0, "fee SOL account should have some balance");
     } catch (error) {
       console.error("Error initializing SOL program token:", error);
       throw error;
@@ -215,7 +247,7 @@ describe("payment", () => {
       [Buffer.from("program-token"), spl.NATIVE_MINT.toBuffer()],
       program.programId
     );
-    assert(programSolAccount.equals(expectedProgramSolAccount), "SOL Program token address is not correctly derived");
+    assert(programSolPDA.equals(expectedProgramSolAccount), "SOL Program token address is not correctly derived");
   });
 
 
@@ -293,7 +325,7 @@ describe("payment", () => {
     const sn = uuid(); // Use a random SN for each test
     console.log('sn:', sn);
     // Get the initial balance of the program SOL account
-    const programBalanceBefore = await provider.connection.getBalance(programSolAccount);
+    const programBalanceBefore = await provider.connection.getBalance(programSolPDA);
     console.log("Program SOL balance before deposit:", programBalanceBefore / LAMPORTS_PER_SOL);
 
     const userTokenBalance = await getTokenAccountBalance(provider.connection, spl.NATIVE_MINT, payerKeypair.publicKey);
@@ -431,11 +463,11 @@ describe("payment", () => {
     const withdrawFrozen = new anchor.BN(LAMPORTS_PER_SOL / 20); // 0.05 SOL
     const withdrawSN = uuid();
 
-    console.log("Withdraw SOL - Program Token PDA:", programSolAccount.toBase58());
+    console.log("Withdraw SOL - Program Token PDA:", programSolPDA.toBase58());
 
     // Record balances before withdrawal
     const userBalanceBefore = await provider.connection.getBalance(payerKeypair.publicKey);
-    const programBalanceBefore = await provider.connection.getBalance(programSolAccount);
+    const programBalanceBefore = await provider.connection.getBalance(programSolPDA);
     console.log("User SOL Balance before withdraw:", userBalanceBefore / LAMPORTS_PER_SOL);
     console.log("Program SOL Balance before withdraw:", programBalanceBefore / LAMPORTS_PER_SOL);
 
@@ -458,7 +490,7 @@ describe("payment", () => {
 
     // Record balances after withdrawal
     const userBalanceAfter = await provider.connection.getBalance(payerKeypair.publicKey);
-    const programBalanceAfter = await provider.connection.getBalance(programSolAccount);
+    const programBalanceAfter = await provider.connection.getBalance(programSolPDA);
     console.log("User SOL Balance after withdraw:", userBalanceAfter / LAMPORTS_PER_SOL);
     console.log("Program SOL Balance after withdraw:", programBalanceAfter / LAMPORTS_PER_SOL);
 

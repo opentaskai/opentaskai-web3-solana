@@ -4,8 +4,12 @@ use anchor_lang::prelude::*;
 pub enum ErrorCode {
     #[msg("The program is disabled")]
     Disabled,
+    #[msg("Invalid parameter")]
+    InvalidParameter,
     #[msg("Invalid amount")]
     InvalidAmount,
+    #[msg("Fee overrun")]
+    FeeOverrun,
     #[msg("Transaction expired")]
     Expired,
     #[msg("Invalid signature")]

@@ -1,5 +1,8 @@
 use anchor_lang::prelude::*;
 use crate::errors::ErrorCode;
+use anchor_lang::system_program::System;
+use anchor_spl::token::{self, Token};
+use crate::state::{PaymentState};
 // use solana_program::ed25519_program;
 // use solana_program::instruction::Instruction;
 use solana_program::sysvar::instructions::{load_instruction_at_checked, load_current_index_checked};
@@ -106,4 +109,65 @@ struct Ed25519SignatureOffsets {
     message_data_offset: u16,
     message_data_size: u16,
     message_instruction_index: u16,
+}
+
+pub fn transfer_sol<'info>(
+    program_token: &UncheckedAccount<'info>,
+    to: &UncheckedAccount<'info>,
+    system_program: &Program<'info, System>,
+    bump: u8,
+    amount: u64,
+) -> Result<()> {
+    let mint_key = anchor_spl::token::spl_token::native_mint::id();
+    let seeds = &[
+        b"program-token",
+        mint_key.as_ref(),
+        &[bump],
+    ];
+
+    msg!("Transfer SOL with seeds: {:?}", seeds);
+    msg!("Bump: {}", bump);
+
+    anchor_lang::solana_program::program::invoke_signed(
+        &anchor_lang::solana_program::system_instruction::transfer(
+            program_token.key,
+            to.key,
+            amount,
+        ),
+        &[
+            program_token.to_account_info(),
+            to.to_account_info(),
+            system_program.to_account_info(),
+        ],
+        &[seeds],
+    )?;
+
+    Ok(())
+}
+
+pub fn transfer_token<'info>(
+    program_token: &UncheckedAccount<'info>,
+    to: &UncheckedAccount<'info>,
+    token_program: &Program<'info, Token>,
+    authority: &Account<'info, PaymentState>,
+    bump: u8,
+    amount: u64,
+) -> Result<()> {
+    let seeds = &[
+        b"payment-state".as_ref(),
+        &[bump],
+    ];
+    token::transfer(
+        CpiContext::new_with_signer(
+            token_program.to_account_info(),
+            token::Transfer {
+                from: program_token.to_account_info(),
+                to: to.to_account_info(),
+                authority: authority.to_account_info(),
+            },
+            &[seeds],
+        ),
+        amount
+    )?;
+    Ok(())
 }
