@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, TokenAccount};
-use crate::utils::verify_ed25519_instruction;
+use crate::utils::{verify_ed25519_instruction, transfer_sol, transfer_token};
 use crate::errors::ErrorCode;
 use crate::events::TransferEvent;
 use crate::Transfer;
@@ -62,19 +61,58 @@ pub fn handler(
 
     // Transfer tokens
     let total_fee = deal.fee + deal.excess_fee;
-    if ctx.accounts.mint.key() == anchor_spl::token::spl_token::native_mint::id() {
-        if deal.amount > 0 {
-            _handler_sol(&ctx, deal.amount)?;
-        }
-        if total_fee > 0 {
-            _handler_sol(&ctx, total_fee)?;
+    // Check if the 'out' account is not a zero address
+    if out != Pubkey::default() {
+        if ctx.accounts.mint.key() == anchor_spl::token::spl_token::native_mint::id() {
+            if deal.amount > 0 {
+                transfer_sol(
+                    &ctx.accounts.program_token,
+                    &ctx.accounts.out,
+                    &ctx.accounts.system_program,
+                    ctx.bumps.program_token,
+                    deal.amount,
+                )?;
+            }
+            if total_fee > 0 {
+                transfer_sol(
+                    &ctx.accounts.program_token,
+                    &ctx.accounts.fee_user,
+                    &ctx.accounts.system_program,
+                    ctx.bumps.program_token,
+                    total_fee,
+                )?;
+            }
+        } else {
+            if deal.amount > 0 {
+                transfer_token(
+                    &ctx.accounts.program_token,
+                    &ctx.accounts.out,
+                    &ctx.accounts.token_program,
+                    &ctx.accounts.payment_state,
+                    ctx.bumps.payment_state,
+                    deal.amount,
+                )?;
+            }
+            if total_fee > 0 {
+                transfer_token(
+                    &ctx.accounts.program_token,
+                    &ctx.accounts.fee_user,
+                    &ctx.accounts.token_program,
+                    &ctx.accounts.payment_state,
+                    ctx.bumps.payment_state,
+                    total_fee,
+                )?;
+            }
         }
     } else {
+        // If 'out' is a zero address, only update account funds
         if deal.amount > 0 {
-            _handler_token(&ctx, deal.amount)?;
+            let to_account = &mut ctx.accounts.to_token_account;
+            to_account.available += deal.amount;
         }
         if total_fee > 0 {
-            _handler_token(&ctx, total_fee)?;
+            let fee_account = &mut ctx.accounts.fee_token_account;
+            fee_account.available += total_fee;
         }
     }
 
@@ -85,6 +123,7 @@ pub fn handler(
         from: deal.from,
         to: deal.to,
         out: ctx.accounts.out.key(),
+        fee_user: ctx.accounts.fee_user.key(),
         available: deal.available,
         frozen: deal.frozen,
         amount: deal.amount,
@@ -94,54 +133,5 @@ pub fn handler(
         user: ctx.accounts.user.key(),
     });
 
-    Ok(())
-}
-
-fn _handler_sol(ctx: &Context<Transfer>, amount: u64) -> Result<()> {
-    let mint_key = ctx.accounts.mint.key();
-    let seeds = &[
-        b"program-token",
-        mint_key.as_ref(),
-        &[ctx.bumps.program_token],
-    ];
-
-    anchor_lang::solana_program::program::invoke_signed(
-        &anchor_lang::solana_program::system_instruction::transfer(
-            ctx.accounts.program_token.key,
-            ctx.accounts.out.key,
-            amount,
-        ),
-        &[
-            ctx.accounts.program_token.to_account_info(),
-            ctx.accounts.out.to_account_info(),
-            ctx.accounts.system_program.to_account_info(),
-        ],
-        &[seeds],
-    )?;
-
-    Ok(())
-}
-
-fn _handler_token(ctx: &Context<Transfer>, amount: u64) -> Result<()> {
-    // Check if the program token is initialized
-    let program_token = TokenAccount::try_deserialize(&mut &ctx.accounts.program_token.data.borrow()[..])?;
-    require!(program_token.mint == ctx.accounts.mint.key(), ErrorCode::InvalidProgramToken);
-
-    let seeds = &[
-        b"payment-state".as_ref(),
-        &[ctx.bumps.payment_state],
-    ];
-    token::transfer(
-        CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            token::Transfer {
-                from: ctx.accounts.program_token.to_account_info(),
-                to: ctx.accounts.out.to_account_info(),
-                authority: ctx.accounts.payment_state.to_account_info(),
-            },
-            &[seeds],
-        ),
-        amount
-    )?;
     Ok(())
 }

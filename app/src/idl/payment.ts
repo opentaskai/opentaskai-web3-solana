@@ -92,7 +92,29 @@ export type Payment = {
       "accounts": [
         {
           "name": "paymentState",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  121,
+                  109,
+                  101,
+                  110,
+                  116,
+                  45,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "userTokenAccount",
@@ -267,7 +289,29 @@ export type Payment = {
       "accounts": [
         {
           "name": "paymentState",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  121,
+                  109,
+                  101,
+                  110,
+                  116,
+                  45,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "userTokenAccount",
@@ -307,10 +351,6 @@ export type Payment = {
         },
         {
           "name": "mint"
-        },
-        {
-          "name": "userToken",
-          "writable": true
         },
         {
           "name": "programToken",
@@ -637,7 +677,7 @@ export type Payment = {
               },
               {
                 "kind": "arg",
-                "path": "from"
+                "path": "deal.from"
               },
               {
                 "kind": "account",
@@ -668,7 +708,39 @@ export type Payment = {
               },
               {
                 "kind": "arg",
-                "path": "to"
+                "path": "deal.to"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "feeTokenAccount",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  45,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payment_state.fee_to_account",
+                "account": "paymentState"
               },
               {
                 "kind": "account",
@@ -690,7 +762,7 @@ export type Payment = {
           "writable": true
         },
         {
-          "name": "userToken",
+          "name": "feeUser",
           "writable": true
         },
         {
@@ -914,10 +986,6 @@ export type Payment = {
           "name": "mint"
         },
         {
-          "name": "userToken",
-          "writable": true
-        },
-        {
           "name": "programToken",
           "writable": true,
           "pda": {
@@ -1112,10 +1180,6 @@ export type Payment = {
         },
         {
           "name": "to",
-          "writable": true
-        },
-        {
-          "name": "userToken",
           "writable": true
         },
         {
@@ -1661,6 +1725,10 @@ export type Payment = {
           },
           {
             "name": "out",
+            "type": "pubkey"
+          },
+          {
+            "name": "feeUser",
             "type": "pubkey"
           },
           {

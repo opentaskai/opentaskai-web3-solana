@@ -48,6 +48,7 @@ pub struct TransferEvent {
     pub from: [u8; 32],
     pub to: [u8; 32],
     pub out: Pubkey,
+    pub fee_user: Pubkey,
     pub available: u64,
     pub frozen: u64,
     pub amount: u64,

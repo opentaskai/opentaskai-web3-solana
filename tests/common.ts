@@ -359,7 +359,6 @@ export async function withdraw(
         user: payerKeypair.publicKey,
         mint: mint,
         to,
-        userToken: to,
         programToken: programTokenPDA,
         record: recordPubkey,
         tokenProgram: spl.TOKEN_PROGRAM_ID,
