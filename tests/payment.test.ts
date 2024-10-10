@@ -15,7 +15,18 @@ import {
   SystemProgram,
 } from "@solana/web3.js";
 
-import { depositWithMessage, depositSol, depositTokens, showUserTokenAccount, getTransactionFee, withdraw, checkTransactionExecuted } from "./common";
+import {
+  FEE_ACCOUNT_FILL,
+  depositWithMessage, 
+  depositSol, 
+  depositTokens, 
+  showUserTokenAccount, 
+  getTransactionFee, 
+  withdraw, 
+  freeze, 
+  unfreeze,
+  checkTransactionExecuted 
+} from "./common";
 import { deployToken, getTokenAccountBalance, getAccountBalance } from "../scripts/tokens";
 import { airdrop, uuid, bytes32Buffer, bufferToArray } from "../scripts/utils";
 import { loadKeypair } from "../scripts/accounts";
@@ -45,7 +56,6 @@ describe("payment", () => {
   const expiredAt = new anchor.BN(new Date().getTime() / 1000 + 1000000000);
 
   // Define constants at the beginning of the describe block
-  const FEE_ACCOUNT_FILL = Buffer.alloc(32).fill(1).toString('hex');
   const SOL_DEPOSIT_ACCOUNT_FILL = Buffer.alloc(32).fill(2).toString('hex');
   const TOKEN_DEPOSIT_ACCOUNT_FILL = Buffer.alloc(32).fill(3).toString('hex');
 
@@ -105,13 +115,13 @@ describe("payment", () => {
       [Buffer.from("user-token"), feeAccountBuffer, mint.toBuffer()],
       program.programId
     );
-    
     console.log('feeTokenPDA:', feeTokenPDA);
 
     [feeSolPDA] = PublicKey.findProgramAddressSync(
       [Buffer.from("user-token"), feeAccountBuffer, spl.NATIVE_MINT.toBuffer()],
       program.programId
     );
+    console.log('feeSolPDA:', feeSolPDA);
 
     console.log("Program token account created or initialized");
 
@@ -188,12 +198,9 @@ describe("payment", () => {
       assert.strictEqual(programTokenAccount.owner.toBase58(), paymentStatePDA.toBase58(), "Program token account owner doesn't match");
       assert.strictEqual(programTokenAccount.amount.toString(), "0", "Program token account should have 0 balance initially");
 
-      const feeTokenAccount = await spl.getAccount(provider.connection, feeTokenPDA);
-      console.log('feeTokenAccount:', feeTokenAccount);
-      assert(feeTokenAccount !== null, "fee token account should exist");
-      assert.strictEqual(feeTokenAccount.mint.toBase58(), mint.toBase58(), "fee token account mint doesn't match");
-      assert.strictEqual(feeTokenAccount.owner.toBase58(), paymentStatePDA.toBase58(), "fee token account owner doesn't match");
-      assert.strictEqual(feeTokenAccount.amount.toString(), "0", "fee token account should have 0 balance initially");
+      const feeTokenAccountInfo = await program.account.userTokenAccount.fetch(feeTokenPDA);
+      showUserTokenAccount(feeTokenAccountInfo, feeTokenPDA, "User Account Info token: ");
+
     } catch (error) {
       console.error("Error initializing SPL program token:", error);
       throw error;
@@ -226,11 +233,8 @@ describe("payment", () => {
       assert(programSolPDAInfo.owner.equals(SystemProgram.programId), "Program SOL account should be owned by the System Program");
       assert(programSolPDAInfo.lamports > 0, "Program SOL account should have some balance");
       
-      const feeSolPDAInfo = await provider.connection.getAccountInfo(feeSolPDA);
-      console.log('feeSolPDAInfo:', feeSolPDAInfo);
-      assert(feeSolPDAInfo !== null, "fee SOL account should exist");
-      assert(feeSolPDAInfo.owner.equals(SystemProgram.programId), "fee SOL account should be owned by the System Program");
-      assert(feeSolPDAInfo.lamports > 0, "fee SOL account should have some balance");
+      const feeSolAccountInfo = await program.account.userTokenAccount.fetch(feeSolPDA);
+      showUserTokenAccount(feeSolAccountInfo, feeSolPDA, "User Account Info sol: ");
     } catch (error) {
       console.error("Error initializing SOL program token:", error);
       throw error;
@@ -250,7 +254,6 @@ describe("payment", () => {
     assert(programSolPDA.equals(expectedProgramSolAccount), "SOL Program token address is not correctly derived");
   });
 
-
   it("Fails to deposit SOL with incorrect signature", async () => {
     const amount = new anchor.BN(LAMPORTS_PER_SOL); // 1 SOL
     const frozen = new anchor.BN(LAMPORTS_PER_SOL / 10); // 0.1 SOL
@@ -261,10 +264,10 @@ describe("payment", () => {
     //test InvalidMessage
     // Create and sign the message
     let message = Buffer.concat([
+      bytes32Buffer(sn2),
       bytes32Buffer(account),
       amount.toArrayLike(Buffer, 'le', 8),
       frozen.toArrayLike(Buffer, 'le', 8),
-      bytes32Buffer(sn2),
       expiredAt.toArrayLike(Buffer, 'le', 8)
     ]);
 
@@ -275,8 +278,8 @@ describe("payment", () => {
         payerKeypair,
         payerKeypair,
         spl.NATIVE_MINT,
-        account,
         sn,
+        account,
         amount,
         frozen,
         expiredAt,
@@ -290,10 +293,10 @@ describe("payment", () => {
 
     //test InvalidPublicKey
     message = Buffer.concat([
+      bytes32Buffer(sn),
       bytes32Buffer(account),
       amount.toArrayLike(Buffer, 'le', 8),
       frozen.toArrayLike(Buffer, 'le', 8),
-      bytes32Buffer(sn),
       expiredAt.toArrayLike(Buffer, 'le', 8)
     ]);
     const signerKeypair = Keypair.generate();
@@ -304,8 +307,8 @@ describe("payment", () => {
         payerKeypair,
         signerKeypair,
         spl.NATIVE_MINT,
-        account,
         sn,
+        account,
         amount,
         frozen,
         expiredAt,
@@ -343,8 +346,8 @@ describe("payment", () => {
       provider,
       program,
       payerKeypair,
-      account,
       sn,
+      account,
       amount,
       frozen,
       expiredAt
@@ -375,8 +378,8 @@ describe("payment", () => {
         provider,
         program,
         payerKeypair,
-        account,
         sn,
+        account,
         amount,
         frozen,
         expiredAt
@@ -411,8 +414,8 @@ describe("payment", () => {
       program,
       payerKeypair,
       mint,
-      account,
       sn,
+      account,
       amount,
       frozen,
       expiredAt
@@ -451,8 +454,8 @@ describe("payment", () => {
       provider,
       program,
       payerKeypair,
-      account,
       depositSN,
+      account,
       depositAmount,
       depositFrozen,
       expiredAt
@@ -480,9 +483,9 @@ describe("payment", () => {
       payerKeypair,
       payerKeypair,
       spl.NATIVE_MINT,
+      withdrawSN,
       account,
       userTokenAccount,
-      withdrawSN,
       withdrawAvailable,
       withdrawFrozen, 
       expiredAt
@@ -562,8 +565,8 @@ describe("payment", () => {
       program,
       payerKeypair,
       mint,
-      account,
       uuid(),
+      account,
       depositAmount,
       depositFrozen,
       expiredAt
@@ -601,10 +604,10 @@ describe("payment", () => {
 
     // Create and sign the message
     const message = Buffer.concat([
+      bytes32Buffer(withdrawSN),
       bytes32Buffer(account),
       withdrawAvailable.toArrayLike(Buffer, 'le', 8),
       withdrawFrozen.toArrayLike(Buffer, 'le', 8),
-      bytes32Buffer(withdrawSN),
       expiredAt.toArrayLike(Buffer, 'le', 8)
     ]);
     // Remove the hashing step
@@ -617,9 +620,9 @@ describe("payment", () => {
       payerKeypair,
       payerKeypair,
       mint,
+      withdrawSN,
       account,
       userTokenAccount,
-      withdrawSN,
       withdrawAvailable,
       withdrawFrozen, 
       expiredAt
@@ -709,9 +712,9 @@ describe("payment", () => {
         payerKeypair,
         payerKeypair,
         mint,
+        withdrawSN,
         account,
         userTokenAccount,
-        withdrawSN,
         withdrawAvailable,
         withdrawFrozen, 
         expiredAt
@@ -722,6 +725,65 @@ describe("payment", () => {
       // console.log('error.error:', error.error);
       assert.strictEqual(error.error.errorCode.code, "AlreadyExecuted");
     }
+  });
+
+  it("Freeze and Unfreeze for SOL", async () => {
+    const amount = new anchor.BN(LAMPORTS_PER_SOL / 10); // 0.1 SOL
+    const fee = new anchor.BN(0); 
+    const account = String(SOL_DEPOSIT_ACCOUNT_FILL);
+    const sn = uuid();
+
+    // Record balances before freeze
+    const programBalanceBefore = await provider.connection.getBalance(programSolPDA);
+    console.log("Program SOL Balance before freeze:", programBalanceBefore / LAMPORTS_PER_SOL);
+
+    try {
+      const tx = await freeze(
+        provider,
+        program,
+        payerKeypair,
+        payerKeypair,
+        spl.NATIVE_MINT,
+        sn,
+        account,
+        amount,
+        expiredAt
+      );
+    } catch(e:any) {
+        assert.fail("Expected an error but the transaction failed");
+    }
+
+
+    console.log("Freeze SOL - Program Token PDA:", programSolPDA.toBase58());
+
+    // Record balances after withdrawal
+    const programBalanceAfter = await provider.connection.getBalance(programSolPDA);
+    console.log("Program SOL Balance after freeze:", programBalanceAfter / LAMPORTS_PER_SOL);
+
+    try {
+      const tx = await unfreeze(
+        provider,
+        program,
+        payerKeypair,
+        payerKeypair,
+        spl.NATIVE_MINT,
+        uuid(),
+        account,
+        amount,
+        fee,
+        expiredAt
+      );
+    } catch(e:any) {
+        assert.fail("Expected an error but the transaction failed");
+    }
+
+    // Check program balance change
+    assert.strictEqual(
+      programBalanceBefore.toString(),
+      programBalanceAfter.toString(),
+      "Program balance should be no change"
+    );
+
   });
   
 });

@@ -6,10 +6,10 @@ use crate::Unfreeze;
 
 pub fn handler(
     ctx: Context<Unfreeze>,
+    sn: [u8; 32],
     account: [u8; 32],
     amount: u64,
     fee: u64,
-    sn: [u8; 32],
     expired_at: i64,
     signature: [u8; 64],
 ) -> Result<()> {
@@ -20,7 +20,7 @@ pub fn handler(
     let clock = Clock::get()?;
     require!(clock.unix_timestamp < expired_at, ErrorCode::Expired);
 
-    let message = [&account[..], &amount.to_le_bytes(), &fee.to_le_bytes(),  &sn[..], &expired_at.to_le_bytes()].concat();
+    let message = [&sn[..], &account[..], &amount.to_le_bytes(), &fee.to_le_bytes(), &expired_at.to_le_bytes()].concat();
     verify_ed25519_instruction(
         &ctx.accounts.instruction_sysvar,
         ctx.accounts.payment_state.signer.as_ref(),

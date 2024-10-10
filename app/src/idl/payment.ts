@@ -234,6 +234,15 @@ export type Payment = {
       ],
       "args": [
         {
+          "name": "sn",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
           "name": "account",
           "type": {
             "array": [
@@ -249,15 +258,6 @@ export type Payment = {
         {
           "name": "frozen",
           "type": "u64"
-        },
-        {
-          "name": "sn",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
         },
         {
           "name": "expiredAt",
@@ -427,6 +427,15 @@ export type Payment = {
       ],
       "args": [
         {
+          "name": "sn",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
           "name": "account",
           "type": {
             "array": [
@@ -438,15 +447,6 @@ export type Payment = {
         {
           "name": "amount",
           "type": "u64"
-        },
-        {
-          "name": "sn",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
         },
         {
           "name": "expiredAt",
@@ -844,20 +844,20 @@ export type Payment = {
           "type": "pubkey"
         },
         {
-          "name": "deal",
-          "type": {
-            "defined": {
-              "name": "transferData"
-            }
-          }
-        },
-        {
           "name": "sn",
           "type": {
             "array": [
               "u8",
               32
             ]
+          }
+        },
+        {
+          "name": "deal",
+          "type": {
+            "defined": {
+              "name": "transferData"
+            }
           }
         },
         {
@@ -1060,6 +1060,15 @@ export type Payment = {
       ],
       "args": [
         {
+          "name": "sn",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
           "name": "account",
           "type": {
             "array": [
@@ -1075,15 +1084,6 @@ export type Payment = {
         {
           "name": "fee",
           "type": "u64"
-        },
-        {
-          "name": "sn",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
         },
         {
           "name": "expiredAt",
@@ -1257,6 +1257,15 @@ export type Payment = {
       ],
       "args": [
         {
+          "name": "sn",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
           "name": "from",
           "type": {
             "array": [
@@ -1272,15 +1281,6 @@ export type Payment = {
         {
           "name": "frozen",
           "type": "u64"
-        },
-        {
-          "name": "sn",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
         },
         {
           "name": "expiredAt",

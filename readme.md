@@ -1,3 +1,6 @@
+# lib.rs
+When modifying the #[instruction(...)] attribute, ensure that the order and presence of parameters match what the client sends. You can remove unused parameters from the end, but be cautious about removing or reordering parameters in the middle. This will help avoid errors related to parameter mismatches.
+
 # Use custom programId
 
 ```

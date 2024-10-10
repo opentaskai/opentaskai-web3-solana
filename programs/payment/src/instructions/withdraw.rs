@@ -6,10 +6,10 @@ use crate::Withdraw;
 
 pub fn handler(
     ctx: Context<Withdraw>,
+    sn: [u8; 32],
     from: [u8; 32],
     available: u64,
     frozen: u64,
-    sn: [u8; 32],
     expired_at: i64,
     signature: [u8; 64],
 ) -> Result<()> {
@@ -19,7 +19,7 @@ pub fn handler(
     let clock = Clock::get()?;
     require!(clock.unix_timestamp < expired_at, ErrorCode::Expired);
 
-    let message = [&from[..], &available.to_le_bytes(), &frozen.to_le_bytes(), &sn[..], &expired_at.to_le_bytes()].concat();
+    let message = [&sn[..], &from[..], &available.to_le_bytes(), &frozen.to_le_bytes(), &expired_at.to_le_bytes()].concat();
     verify_ed25519_instruction(
         &ctx.accounts.instruction_sysvar,
         ctx.accounts.payment_state.signer.as_ref(),

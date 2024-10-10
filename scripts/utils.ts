@@ -82,8 +82,8 @@ export function parseEventFromTransaction(tx: any, programId: string, instructio
       sn: dataBuffer.slice(8, 40), // First 32 bytes for sn
       account: dataBuffer.slice(40, 72), // Next 32 bytes for account
       token: new PublicKey(dataBuffer.slice(72, 104)), // Next 32 bytes for token
-      amount: dataBuffer.readBigUInt64LE(104), // Adjusted offset for amount
-      frozen: dataBuffer.readBigUInt64LE(112), // Adjusted offset for frozen
+      amount: dataBuffer.readBigUInt64LE(104), // Next 8 bytes for amount
+      frozen: dataBuffer.readBigUInt64LE(112), // Next 8 bytes for frozen
       user: new PublicKey(dataBuffer.slice(120, 152)), // Next 32 bytes for user
     };
   } else if (instruction === 'Withdraw') {
@@ -91,10 +91,43 @@ export function parseEventFromTransaction(tx: any, programId: string, instructio
       sn: dataBuffer.slice(8, 40), // First 32 bytes for sn
       token: new PublicKey(dataBuffer.slice(40, 72)), // Next 32 bytes for token
       from: dataBuffer.slice(72, 104), // Next 32 bytes for from account
-      to: new PublicKey(dataBuffer.slice(104, 136)), // Next 32 bytes for token
-      available: dataBuffer.readBigUInt64LE(136), // Adjusted offset for available
-      frozen: dataBuffer.readBigUInt64LE(144), // Adjusted offset for frozen
+      to: new PublicKey(dataBuffer.slice(104, 136)), // Next 32 bytes for recepient
+      available: dataBuffer.readBigUInt64LE(136), // Next 8 bytes for available
+      frozen: dataBuffer.readBigUInt64LE(144), // Next 8 bytes for frozen
       user: new PublicKey(dataBuffer.slice(152, 184)), // Next 32 bytes for user
+    };
+  } else if (instruction === 'Freeze') {
+    return {
+      sn: dataBuffer.slice(8, 40), // First 32 bytes for sn
+      account: dataBuffer.slice(40, 72), // Next 32 bytes for account
+      token: new PublicKey(dataBuffer.slice(72, 104)), // Next 32 bytes for token
+      amount: dataBuffer.readBigUInt64LE(104), // Next 8 bytes for amount
+      user: new PublicKey(dataBuffer.slice(112, 144)), // Next 32 bytes for user
+    };
+  } else if (instruction === 'Unfreeze') {
+    return {
+      sn: dataBuffer.slice(8, 40), // First 32 bytes for sn
+      account: dataBuffer.slice(40, 72), // Next 32 bytes for account
+      token: new PublicKey(dataBuffer.slice(72, 104)), // Next 32 bytes for token
+      amount: dataBuffer.readBigUInt64LE(104), // Next 8 bytes for amount
+      fee: dataBuffer.readBigUInt64LE(112), // Next 8 bytes for fee
+      user: new PublicKey(dataBuffer.slice(120, 152)), // Next 32 bytes for user
+    };
+  } else if (instruction === 'Transfer') {
+    return {
+      sn: dataBuffer.slice(8, 40), // First 32 bytes for sn
+      token: new PublicKey(dataBuffer.slice(40, 72)), // Next 32 bytes for token
+      from: dataBuffer.slice(72, 104), // Next 32 bytes for from account
+      to: dataBuffer.slice(104, 136), // Next 32 bytes for to account
+      out: new PublicKey(dataBuffer.slice(136, 168)), // Next 32 bytes for recepient
+      fee_user: new PublicKey(dataBuffer.slice(168, 200)), // Next 32 bytes for fee_user
+      available: dataBuffer.readBigUInt64LE(200), // Next 8 bytes for available
+      frozen: dataBuffer.readBigUInt64LE(208), // Next 8 bytes for frozen
+      amount: dataBuffer.readBigUInt64LE(216), // Next 8 bytes for amount
+      fee: dataBuffer.readBigUInt64LE(224), // Next 8 bytes for fee
+      paid: dataBuffer.readBigUInt64LE(232), // Next 8 bytes for paid
+      excess_fee: dataBuffer.readBigUInt64LE(240), // Next 8 bytes for excess_fee
+      user: new PublicKey(dataBuffer.slice(240, 272)), // Next 32 bytes for user
     };
   } else {
     return null;

@@ -35,60 +35,60 @@ pub mod payment {
 
     pub fn deposit(
         ctx: Context<Deposit>,
+        sn: [u8; 32],
         account: [u8; 32],
         amount: u64,
         frozen: u64,
-        sn: [u8; 32],
         expired_at: i64,
         signature: [u8; 64],
     ) -> Result<()> {
-        deposit::handler(ctx, account, amount, frozen, sn, expired_at, signature)
+        deposit::handler(ctx, sn, account, amount, frozen, expired_at, signature)
     }
 
     pub fn withdraw(
         ctx: Context<Withdraw>,
+        sn: [u8; 32],
         from: [u8; 32],
         available: u64,
         frozen: u64,
-        sn: [u8; 32],
         expired_at: i64,
         signature: [u8; 64],
     ) -> Result<()> {
-        withdraw::handler(ctx, from, available, frozen, sn, expired_at, signature)
+        withdraw::handler(ctx, sn, from, available, frozen, expired_at, signature)
     }
 
     pub fn freeze(
         ctx: Context<Freeze>,
+        sn: [u8; 32],
         account: [u8; 32],
         amount: u64,
-        sn: [u8; 32],
         expired_at: i64,
         signature: [u8; 64],
     ) -> Result<()> {
-        freeze::handler(ctx, account, amount, sn, expired_at, signature)
+        freeze::handler(ctx, sn, account, amount, expired_at, signature)
     }
 
     pub fn unfreeze(
         ctx: Context<Unfreeze>,
+        sn: [u8; 32],
         account: [u8; 32],
         amount: u64,
         fee: u64,
-        sn: [u8; 32],
         expired_at: i64,
         signature: [u8; 64],
     ) -> Result<()> {
-        unfreeze::handler(ctx, account, amount, fee, sn, expired_at, signature)
+        unfreeze::handler(ctx, sn, account, amount, fee, expired_at, signature)
     }
 
     pub fn transfer(
         ctx: Context<Transfer>,
         out: Pubkey,
-        deal: TransferData,
         sn: [u8; 32],
+        deal: TransferData,
         expired_at: i64,
         signature: [u8; 64],
     ) -> Result<()> {
-        transfer::handler(ctx, out, deal, sn, expired_at, signature)
+        transfer::handler(ctx, out, sn, deal, expired_at, signature)
     }
 }
 
@@ -128,13 +128,11 @@ pub struct InitializeProgramToken<'info> {
     #[account(
         init_if_needed,
         payer = owner,
+        space = 8 + UserTokenAccount::LEN,
         seeds = [b"user-token", payment_state.fee_to_account.as_ref(), mint.key().as_ref()],
-        bump,
-        space = if *mint.key == anchor_spl::token::spl_token::native_mint::id() { 0 } else { 165 },
-        owner = if *mint.key == anchor_spl::token::spl_token::native_mint::id() { system_program.key() } else { token_program.key() }
+        bump
     )]
-    /// CHECK: This account is initialized in the instruction handler
-    pub fee_token_account: UncheckedAccount<'info>,
+    pub fee_token_account: Account<'info, UserTokenAccount>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
@@ -151,7 +149,7 @@ pub struct ChangeOwner<'info> {
 
 
 #[derive(Accounts)]
-#[instruction(account: [u8; 32], amount: u64, frozen: u64, sn: [u8; 32], expired_at: i64)]
+#[instruction(sn: [u8; 32], account: [u8; 32])]
 pub struct Deposit<'info> {
     #[account(mut, seeds = [b"payment-state"], bump)]
     pub payment_state: Account<'info, PaymentState>,
@@ -195,7 +193,7 @@ pub struct Deposit<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(from: [u8; 32], available: u64, frozen: u64, sn: [u8; 32], expired_at: i64)]
+#[instruction(sn: [u8; 32], from: [u8; 32])]
 pub struct Withdraw<'info> {
     #[account(mut, seeds = [b"payment-state"], bump)]
     pub payment_state: Account<'info, PaymentState>,
@@ -240,7 +238,7 @@ pub struct Withdraw<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(account: [u8; 32], amount: u64, sn: [u8; 32], expired_at: i64)]
+#[instruction(sn: [u8; 32], account: [u8; 32])]
 pub struct Freeze<'info> {
     #[account(mut, seeds = [b"payment-state"], bump)]
     pub payment_state: Account<'info, PaymentState>,
@@ -282,7 +280,7 @@ pub struct Freeze<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(from: [u8; 32], available: u64, frozen: u64, fee: u64, sn: [u8; 32], expired_at: i64)]
+#[instruction(sn: [u8; 32], from: [u8; 32])]
 pub struct Unfreeze<'info> {
     #[account(mut, seeds = [b"payment-state"], bump)]
     pub payment_state: Account<'info, PaymentState>,
@@ -304,7 +302,6 @@ pub struct Unfreeze<'info> {
     pub user: Signer<'info>,
     /// CHECK: This account is checked in the instruction handler
     pub mint: UncheckedAccount<'info>,
-    /// CHECK: This is the token account that we want to transfer to
     #[account(
         mut,
         seeds = [b"program-token", mint.key().as_ref()],
@@ -330,7 +327,7 @@ pub struct Unfreeze<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(deal: TransferData, sn: [u8; 32], expired_at: i64)]
+#[instruction(sn: [u8; 32], deal: TransferData)]
 pub struct Transfer<'info> {
     #[account(mut, seeds = [b"payment-state"], bump)]
     pub payment_state: Account<'info, PaymentState>,

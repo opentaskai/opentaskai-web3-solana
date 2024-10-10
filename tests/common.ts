@@ -17,6 +17,8 @@ import { getTokenAccountBalance, getAccountBalance } from "../scripts/tokens";
 import { parseEventFromTransaction, bytesBuffer, bytes32Buffer } from "../scripts/utils";
 import assert from "assert";
 
+export const FEE_ACCOUNT_FILL = Buffer.alloc(32).fill(1).toString('hex');
+
 export async function getTransactionFee(provider: anchor.AnchorProvider, txSignature: string) {
   // Fetch the transaction to get the exact fee (with retry logic)
   let txDetails = null;
@@ -37,6 +39,25 @@ export async function getTransactionFee(provider: anchor.AnchorProvider, txSigna
   return txDetails.meta.fee;
 }
 
+export async function checkTransactionExecuted(provider: anchor.AnchorProvider, program: Program<Payment>, sn: string) {
+  // Derive the PDA for the TransactionRecord
+  const [transactionRecordPDA] = PublicKey.findProgramAddressSync(
+    [Buffer.from("record"), bytes32Buffer(sn)],
+    program.programId
+  );
+
+  // Fetch the TransactionRecord account
+  try {
+    const transactionRecord = await program.account.transactionRecord.fetch(transactionRecordPDA);
+    console.log('transactionRecord:', transactionRecord);
+    // Check if the transaction has been executed
+    return transactionRecord.executed;
+  } catch(e: any) {
+    console.log('transactionRecord except:', e.message);
+    if (e.message.indexOf('Account does not exist or has no data') != -1) return false;
+    throw e;
+  } 
+}
 
 export async function showUserTokenAccount(
   info: any,
@@ -82,13 +103,13 @@ export async function depositSol(
   provider: anchor.AnchorProvider,
   program: Program<Payment>,
   payerKeypair: Keypair,
-  account: string,
   sn: string,
+  account: string,
   amount: anchor.BN,
   frozen: anchor.BN,
   expiredAt: anchor.BN
 ) {
-  return deposit(provider, program, payerKeypair, payerKeypair, spl.NATIVE_MINT, account, sn, amount, frozen, expiredAt);
+  return deposit(provider, program, payerKeypair, payerKeypair, spl.NATIVE_MINT, sn, account, amount, frozen, expiredAt);
 }
 
 export async function depositTokens(
@@ -96,13 +117,13 @@ export async function depositTokens(
   program: Program<Payment>,
   payerKeypair: Keypair,
   mint: PublicKey,
-  account: string,
   sn: string,
+  account: string,
   amount: anchor.BN,
   frozen: anchor.BN,
   expiredAt: anchor.BN
 ) {
-  return deposit(provider, program, payerKeypair, payerKeypair, mint, account, sn, amount, frozen, expiredAt);
+  return deposit(provider, program, payerKeypair, payerKeypair, mint, sn, account, amount, frozen, expiredAt);
 }
 
 
@@ -112,8 +133,8 @@ export async function depositWithMessage(
   payerKeypair: Keypair,
   signerKeypair: Keypair,
   mint: PublicKey,
-  account: string,
   sn: string,
+  account: string,
   amount: anchor.BN,
   frozen: anchor.BN,
   expiredAt: anchor.BN,
@@ -167,10 +188,10 @@ export async function depositWithMessage(
   if (message == null) {
     // Create and sign the message
     message = Buffer.concat([
+      snBuffer,
       accountBuffer,
       amount.toArrayLike(Buffer, 'le', 8),
       frozen.toArrayLike(Buffer, 'le', 8),
-      snBuffer,
       expiredAt.toArrayLike(Buffer, 'le', 8)
     ]);
   }
@@ -187,7 +208,7 @@ export async function depositWithMessage(
     
     // console.log('input parameters: ',  {user: payerKeypair.publicKey.toBase58(), token: mint, account:accountBuffer, amount: amount.toString(), frozen: frozen.toString(), sn: snBuffer, expiredAt, signature});
     const tx = await program.methods
-    .deposit(accountBuffer, amount, frozen, snBuffer, expiredAt, signature)
+    .deposit(snBuffer, accountBuffer, amount, frozen, expiredAt, signature)
     .accounts({
       paymentState: paymentStatePDA,
       userTokenAccount: userAccountPDA,
@@ -268,13 +289,13 @@ export async function deposit(
   payerKeypair: Keypair,
   signerKeypair: Keypair,
   mint: PublicKey,
-  account: string,
   sn: string,
+  account: string,
   amount: anchor.BN,
   frozen: anchor.BN,
   expiredAt: anchor.BN,
 ) {
-  return depositWithMessage(provider, program, payerKeypair, signerKeypair, mint, account, sn, amount, frozen, expiredAt);
+  return depositWithMessage(provider, program, payerKeypair, signerKeypair, mint, sn, account, amount, frozen, expiredAt);
 }
 
 export async function withdraw(
@@ -283,9 +304,9 @@ export async function withdraw(
   payerKeypair: Keypair,
   signerKeypair: Keypair,
   mint: PublicKey,
+  sn: string,
   account: string,
   to: PublicKey,
-  sn: string,
   available: anchor.BN,
   frozen: anchor.BN,
   expiredAt: anchor.BN
@@ -320,25 +341,12 @@ export async function withdraw(
 
   console.log('withdraw recordPubkey:', recordPubkey);
 
-  let tokenAccount = payerKeypair.publicKey;
-  if (mint.toBase58() !== "So11111111111111111111111111111111111111112") {
-    // Ensure user token account exists and is an associated token account
-    const userTokenAccount = await spl.getOrCreateAssociatedTokenAccount(
-      provider.connection,
-      payerKeypair,
-      mint,
-      payerKeypair.publicKey
-    );
-    tokenAccount = userTokenAccount.address;
-  }
-  console.log("User token account:", tokenAccount.toBase58());
-
   // Create and sign the message
   const message = Buffer.concat([
+    snBuffer,
     accountBuffer,
     available.toArrayLike(Buffer, 'le', 8),
     frozen.toArrayLike(Buffer, 'le', 8),
-    snBuffer,
     expiredAt.toArrayLike(Buffer, 'le', 8)
   ]);
 
@@ -352,7 +360,7 @@ export async function withdraw(
 
     // console.log('input parameters: ',  {user: payerKeypair.publicKey.toBase58(), token: mint, account:accountBuffer, available: available.toString(), frozen: frozen.toString(), sn: snBuffer, expiredAt, signature});
     const tx = await program.methods
-      .withdraw(accountBuffer, available, frozen, snBuffer, expiredAt, signature)
+      .withdraw(snBuffer, accountBuffer, available, frozen, expiredAt, signature)
       .accounts({
         paymentState: paymentStatePDA,
         userTokenAccount: userAccountPDA,
@@ -381,14 +389,14 @@ export async function withdraw(
     // Fetch the transaction details to get the events
     const txDetails = await provider.connection.getTransaction(tx, { commitment: 'confirmed' });
     // console.log("WithdrawEvent txDetails:", JSON.stringify(txDetails));
-    const withdrawEvent = parseEventFromTransaction(txDetails, program.programId.toBase58(), 'Withdraw');
-    console.log("Parsed WithdrawEvent:", withdrawEvent);
-    console.log("Parsed WithdrawEvent SN:", withdrawEvent.sn.toString('hex')); // Log parsed SN
+    const eventLog = parseEventFromTransaction(txDetails, program.programId.toBase58(), 'Withdraw');
+    console.log("Parsed WithdrawEvent:", eventLog);
+    console.log("Parsed WithdrawEvent SN:", eventLog.sn.toString('hex')); // Log parsed SN
     
-    assert.strictEqual(available.toString(), withdrawEvent.available.toString(), "available doesn't match");
-    assert.strictEqual(frozen.toString(), withdrawEvent.frozen.toString(), "frozen doesn't match");
-    assert.strictEqual(snBuffer.toString('hex'), withdrawEvent.sn.toString('hex'), "sn doesn't match");
-    assert.strictEqual(payerKeypair.publicKey.toBase58(), withdrawEvent.user.toBase58(), "user doesn't match");
+    assert.strictEqual(available.toString(), eventLog.available.toString(), "available doesn't match");
+    assert.strictEqual(frozen.toString(), eventLog.frozen.toString(), "frozen doesn't match");
+    assert.strictEqual(snBuffer.toString('hex'), eventLog.sn.toString('hex'), "sn doesn't match");
+    assert.strictEqual(payerKeypair.publicKey.toBase58(), eventLog.user.toBase58(), "user doesn't match");
 
     return tx;
   } catch (error) {
@@ -404,22 +412,259 @@ export async function withdraw(
   }
 }
 
-export async function checkTransactionExecuted(provider: anchor.AnchorProvider, program: Program<Payment>, sn: string) {
-  // Derive the PDA for the TransactionRecord
-  const [transactionRecordPDA] = PublicKey.findProgramAddressSync(
-    [Buffer.from("record"), bytes32Buffer(sn)],
+export async function freeze(
+  provider: anchor.AnchorProvider,
+  program: Program<Payment>,
+  payerKeypair: Keypair,
+  signerKeypair: Keypair,
+  mint: PublicKey,
+  sn: string,
+  account: string,
+  amount: anchor.BN,
+  expiredAt: anchor.BN
+) {
+  const accountBuffer = bytes32Buffer(account);
+  const snBuffer = bytes32Buffer(sn);
+
+  // Derive the payment state account PDA
+  const [paymentStatePDA] = PublicKey.findProgramAddressSync(
+    [Buffer.from("payment-state")],
     program.programId
   );
 
-  // Fetch the TransactionRecord account
+  // Derive the user token account PDA
+  const [userAccountPDA] = PublicKey.findProgramAddressSync(
+    [Buffer.from("user-token"), accountBuffer, mint.toBuffer()],
+    program.programId
+  );
+
+  // Derive the program token account PDA
+  const [programTokenPDA] = PublicKey.findProgramAddressSync(
+    [Buffer.from("program-token"), mint.toBuffer()],
+    program.programId
+  );
+
+  // Derive the record account PDA
+  // todo [Buffer.from("record"), Buffer.from(withdrawSN.slice(0, 26))], // Adjusted to fit within 32 bytes
+  const [recordPubkey] = PublicKey.findProgramAddressSync(
+    [Buffer.from("record"), snBuffer],
+    program.programId
+  );
+
+
+  const userTokenAccountInfoBefore = await program.account.userTokenAccount.fetch(userAccountPDA);
+  showUserTokenAccount(userTokenAccountInfoBefore, userAccountPDA, "User Account Info before freeze: ");
+
+
+  // Create and sign the message
+  const message = Buffer.concat([
+    snBuffer,
+    accountBuffer,
+    amount.toArrayLike(Buffer, 'le', 8),
+    expiredAt.toArrayLike(Buffer, 'le', 8)
+  ]);
+
   try {
-    const transactionRecord = await program.account.transactionRecord.fetch(transactionRecordPDA);
-    console.log('transactionRecord:', transactionRecord);
-    // Check if the transaction has been executed
-    return transactionRecord.executed;
-  } catch(e: any) {
-    console.log('transactionRecord except:', e.message);
-    if (e.message.indexOf('Account does not exist or has no data') != -1) return false;
-    throw e;
-  } 
+    const signature = signMessageForEd25519(message, signerKeypair);
+    const ed25519Instruction = Ed25519Program.createInstructionWithPublicKey({
+      publicKey: signerKeypair.publicKey.toBytes(),
+      message: message,
+      signature: signature,
+    });
+
+    // console.log('input parameters: ',  {user: payerKeypair.publicKey.toBase58(), token: mint, account:accountBuffer, available: available.toString(), frozen: frozen.toString(), sn: snBuffer, expiredAt, signature});
+    const tx = await program.methods
+      .freeze(snBuffer, accountBuffer, amount, expiredAt, signature)
+      .accounts({
+        paymentState: paymentStatePDA,
+        userTokenAccount: userAccountPDA,
+        user: payerKeypair.publicKey,
+        mint: mint,
+        programToken: programTokenPDA,
+        record: recordPubkey,
+        tokenProgram: spl.TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        associatedTokenProgram: spl.ASSOCIATED_TOKEN_PROGRAM_ID,
+        instructionSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+      })
+      .preInstructions([ed25519Instruction])
+      .signers([payerKeypair])
+      .rpc();
+
+    console.log("Transaction signature:", tx);
+    const txResult = await provider.connection.confirmTransaction(tx, 'confirmed');
+    if (txResult.value.err) {
+      console.error("Transaction failed:", txResult.value.err);
+      throw new Error("Transaction failed");
+    }
+
+    const userTokenAccountInfoAfter = await program.account.userTokenAccount.fetch(userAccountPDA);
+    showUserTokenAccount(userTokenAccountInfoAfter, userAccountPDA, "User Account Info after freeze: ");
+    assert.strictEqual(userTokenAccountInfoAfter.available.toString(), userTokenAccountInfoBefore.available.sub(amount).toString(), "user token account available doesn't match");
+    assert.strictEqual(userTokenAccountInfoAfter.frozen.toString(), userTokenAccountInfoBefore.frozen.add(amount).toString(), "user token account froze doesn't match");
+
+
+    console.log("SN bytes32:", snBuffer.toString('hex')); // Log after signing
+    // Fetch the transaction details to get the events
+    const txDetails = await provider.connection.getTransaction(tx, { commitment: 'confirmed' });
+    // console.log("WithdrawEvent txDetails:", JSON.stringify(txDetails));
+    const eventLog = parseEventFromTransaction(txDetails, program.programId.toBase58(), 'Freeze');
+    console.log("Parsed FreezeEvent:", eventLog);
+    console.log("Parsed FreezeEvent SN:", eventLog.sn.toString('hex')); // Log parsed SN
+    
+    assert.strictEqual(accountBuffer.toString(), eventLog.account.toString(), "account doesn't match");
+    assert.strictEqual(amount.toString(), eventLog.amount.toString(), "amount doesn't match");
+    assert.strictEqual(snBuffer.toString('hex'), eventLog.sn.toString('hex'), "sn doesn't match");
+    assert.strictEqual(payerKeypair.publicKey.toBase58(), eventLog.user.toBase58(), "user doesn't match");
+
+    return tx;
+  } catch (error) {
+    console.error("freeze Token Error details:", error);
+    if (error instanceof anchor.AnchorError) {
+      console.log("Error code:", error.error.errorCode.code);
+      console.log("Error msg:", error.error.errorMessage);
+    } else if (error instanceof anchor.web3.SendTransactionError) {
+      console.log("Transaction Error:", error.message);
+      console.log("Error Logs:", error.logs);
+    }
+    throw error;
+  }
+}
+
+export async function unfreeze(
+  provider: anchor.AnchorProvider,
+  program: Program<Payment>,
+  payerKeypair: Keypair,
+  signerKeypair: Keypair,
+  mint: PublicKey,
+  sn: string,
+  account: string,
+  amount: anchor.BN,
+  fee: anchor.BN,
+  expiredAt: anchor.BN
+) {
+  const accountBuffer = bytes32Buffer(account);
+  const snBuffer = bytes32Buffer(sn);
+
+  console.log('mint:', mint.toBase58());
+
+  // Derive the payment state account PDA
+  const [paymentStatePDA] = PublicKey.findProgramAddressSync(
+    [Buffer.from("payment-state")],
+    program.programId
+  );
+
+  // Derive the user token account PDA
+  const [userAccountPDA] = PublicKey.findProgramAddressSync(
+    [Buffer.from("user-token"), accountBuffer, mint.toBuffer()],
+    program.programId
+  );
+
+  // Derive the user fee account PDA
+  const [feeAccountPDA] = PublicKey.findProgramAddressSync(
+    [Buffer.from("user-token"), bytes32Buffer(FEE_ACCOUNT_FILL), mint.toBuffer()],
+    program.programId
+  );
+
+  console.log('unfreeze feeAccountPDA:', feeAccountPDA);
+
+  const feeAccountPDAInfo = await provider.connection.getAccountInfo(feeAccountPDA);
+  console.log('feeAccountPDAInfo:', feeAccountPDAInfo);
+
+  // Derive the program token account PDA
+  const [programTokenPDA] = PublicKey.findProgramAddressSync(
+    [Buffer.from("program-token"), mint.toBuffer()],
+    program.programId
+  );
+
+  // Derive the record account PDA
+  // todo [Buffer.from("record"), Buffer.from(withdrawSN.slice(0, 26))], // Adjusted to fit within 32 bytes
+  const [recordPubkey] = PublicKey.findProgramAddressSync(
+    [Buffer.from("record"), snBuffer],
+    program.programId
+  );
+
+
+  const userTokenAccountInfoBefore = await program.account.userTokenAccount.fetch(userAccountPDA);
+  showUserTokenAccount(userTokenAccountInfoBefore, userAccountPDA, "User Account Info before freeze: ");
+
+
+  // Create and sign the message
+  const message = Buffer.concat([
+    snBuffer,
+    accountBuffer,
+    amount.toArrayLike(Buffer, 'le', 8),
+    fee.toArrayLike(Buffer, 'le', 8),
+    expiredAt.toArrayLike(Buffer, 'le', 8)
+  ]);
+
+  try {
+    const signature = signMessageForEd25519(message, signerKeypair);
+    const ed25519Instruction = Ed25519Program.createInstructionWithPublicKey({
+      publicKey: signerKeypair.publicKey.toBytes(),
+      message: message,
+      signature: signature,
+    });
+
+    // console.log('input parameters: ',  {user: payerKeypair.publicKey.toBase58(), token: mint, account:accountBuffer, available: available.toString(), frozen: frozen.toString(), sn: snBuffer, expiredAt, signature});
+    const tx = await program.methods
+      .unfreeze(snBuffer, accountBuffer, amount, fee, expiredAt, signature)
+      .accounts({
+        paymentState: paymentStatePDA,
+        userTokenAccount: userAccountPDA,
+        feeTokenAccount: feeAccountPDA,
+        user: payerKeypair.publicKey,
+        mint: mint,
+        programToken: programTokenPDA,
+        record: recordPubkey,
+        tokenProgram: spl.TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        associatedTokenProgram: spl.ASSOCIATED_TOKEN_PROGRAM_ID,
+        instructionSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+      })
+      .preInstructions([ed25519Instruction])
+      .signers([payerKeypair])
+      .rpc();
+
+    console.log("Transaction signature:", tx);
+    const txResult = await provider.connection.confirmTransaction(tx, 'confirmed');
+    if (txResult.value.err) {
+      console.error("Transaction failed:", txResult.value.err);
+      throw new Error("Transaction failed");
+    }
+
+    const userTokenAccountInfoAfter = await program.account.userTokenAccount.fetch(userAccountPDA);
+    showUserTokenAccount(userTokenAccountInfoAfter, userAccountPDA, "User Account Info after freeze: ");
+    assert.strictEqual(userTokenAccountInfoAfter.available.toString(), userTokenAccountInfoBefore.available.add(amount).toString(), "user token account available doesn't match");
+    assert.strictEqual(userTokenAccountInfoAfter.frozen.toString(), userTokenAccountInfoBefore.frozen.sub(amount).toString(), "user token account froze doesn't match");
+
+
+    console.log("SN bytes32:", snBuffer.toString('hex')); // Log after signing
+    // Fetch the transaction details to get the events
+    const txDetails = await provider.connection.getTransaction(tx, { commitment: 'confirmed' });
+    // console.log("WithdrawEvent txDetails:", JSON.stringify(txDetails));
+    const eventLog = parseEventFromTransaction(txDetails, program.programId.toBase58(), 'Unfreeze');
+    console.log("Parsed UnFreezeEvent:", eventLog);
+    console.log("Parsed UnFreezeEvent SN:", eventLog.sn.toString('hex')); // Log parsed SN
+    
+    assert.strictEqual(accountBuffer.toString(), eventLog.account.toString(), "account doesn't match");
+    assert.strictEqual(amount.toString(), eventLog.amount.toString(), "amount doesn't match");
+    assert.strictEqual(fee.toString(), eventLog.fee.toString(), "fee doesn't match");
+    assert.strictEqual(snBuffer.toString('hex'), eventLog.sn.toString('hex'), "sn doesn't match");
+    assert.strictEqual(payerKeypair.publicKey.toBase58(), eventLog.user.toBase58(), "user doesn't match");
+
+    return tx;
+  } catch (error) {
+    console.error("freeze Token Error details:", error);
+    if (error instanceof anchor.AnchorError) {
+      console.log("Error code:", error.error.errorCode.code);
+      console.log("Error msg:", error.error.errorMessage);
+    } else if (error instanceof anchor.web3.SendTransactionError) {
+      console.log("Transaction Error:", error.message);
+      console.log("Error Logs:", error.logs);
+    }
+    throw error;
+  }
 }

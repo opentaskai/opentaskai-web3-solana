@@ -8,8 +8,8 @@ use crate::state::{TransferData};
 pub fn handler(
     ctx: Context<Transfer>,
     out: Pubkey,
-    deal: TransferData,
     sn: [u8; 32],
+    deal: TransferData,
     expired_at: i64,
     signature: [u8; 64],
 ) -> Result<()> {
@@ -26,7 +26,7 @@ pub fn handler(
         deal.frozen >= deal.excess_fee, ErrorCode::InvalidParameter
     );
 
-    let message = [&out.to_bytes()[..], &deal.to_bytes()[..], &sn[..], &expired_at.to_le_bytes()].concat();
+    let message = [&out.to_bytes()[..], &sn[..], &deal.to_bytes()[..], &expired_at.to_le_bytes()].concat();
     verify_ed25519_instruction(
         &ctx.accounts.instruction_sysvar,
         ctx.accounts.payment_state.signer.as_ref(),
