@@ -25,6 +25,7 @@ import {
   withdraw, 
   freeze, 
   unfreeze,
+  unfreezeWithAccount,
   checkTransactionExecuted 
 } from "./common";
 import { deployToken, getTokenAccountBalance, getAccountBalance } from "../scripts/tokens";
@@ -199,7 +200,9 @@ describe("payment", () => {
       assert.strictEqual(programTokenAccount.amount.toString(), "0", "Program token account should have 0 balance initially");
 
       const feeTokenAccountInfo = await program.account.userTokenAccount.fetch(feeTokenPDA);
-      showUserTokenAccount(feeTokenAccountInfo, feeTokenPDA, "User Account Info token: ");
+      showUserTokenAccount(feeTokenAccountInfo, feeTokenPDA, "Fee Account Info token: ");
+      assert.strictEqual(feeTokenAccountInfo.available.toNumber(), 0, "feeTokenAccountInfo available doesn't match");
+      assert.strictEqual(feeTokenAccountInfo.frozen.toNumber(), 0, "feeTokenAccountInfo frozen doesn't match");
 
     } catch (error) {
       console.error("Error initializing SPL program token:", error);
@@ -234,7 +237,9 @@ describe("payment", () => {
       assert(programSolPDAInfo.lamports > 0, "Program SOL account should have some balance");
       
       const feeSolAccountInfo = await program.account.userTokenAccount.fetch(feeSolPDA);
-      showUserTokenAccount(feeSolAccountInfo, feeSolPDA, "User Account Info sol: ");
+      showUserTokenAccount(feeSolAccountInfo, feeSolPDA, "Fee Account Info sol: ");
+      assert.strictEqual(feeSolAccountInfo.available.toNumber(), 0, "feeSolAccountInfo available doesn't match");
+      assert.strictEqual(feeSolAccountInfo.frozen.toNumber(), 0, "feeSolAccountInfo frozen doesn't match");
     } catch (error) {
       console.error("Error initializing SOL program token:", error);
       throw error;
@@ -729,16 +734,14 @@ describe("payment", () => {
 
   it("Freeze and Unfreeze for SOL", async () => {
     const amount = new anchor.BN(LAMPORTS_PER_SOL / 10); // 0.1 SOL
-    const fee = new anchor.BN(0); 
+    const fee = amount.div(new anchor.BN(10)); // 0.01 SOL
     const account = String(SOL_DEPOSIT_ACCOUNT_FILL);
-    const sn = uuid();
-
     // Record balances before freeze
     const programBalanceBefore = await provider.connection.getBalance(programSolPDA);
     console.log("Program SOL Balance before freeze:", programBalanceBefore / LAMPORTS_PER_SOL);
-
+    let sn = uuid();
     try {
-      const tx = await freeze(
+      await freeze(
         provider,
         program,
         payerKeypair,
@@ -753,20 +756,139 @@ describe("payment", () => {
         assert.fail("Expected an error but the transaction failed");
     }
 
-
-    console.log("Freeze SOL - Program Token PDA:", programSolPDA.toBase58());
-
-    // Record balances after withdrawal
-    const programBalanceAfter = await provider.connection.getBalance(programSolPDA);
-    console.log("Program SOL Balance after freeze:", programBalanceAfter / LAMPORTS_PER_SOL);
-
+    // console.log("Freeze SOL - Program Token PDA:", programSolPDA.toBase58());
+    
+    // fail to test the same sn
     try {
-      const tx = await unfreeze(
+      await freeze(
         provider,
         program,
         payerKeypair,
         payerKeypair,
         spl.NATIVE_MINT,
+        sn,
+        account,
+        amount,
+        expiredAt
+      );
+    } catch(e:any) {
+        assert.ok("Expected an error but the transaction failed");
+        assert.strictEqual(e.error.errorCode.code, "AlreadyExecuted");
+    }
+
+    // Record balances after freeze
+    const programBalanceAfter = await provider.connection.getBalance(programSolPDA);
+    console.log("Program SOL Balance after freeze:", programBalanceAfter / LAMPORTS_PER_SOL);
+
+    sn = uuid();
+    try {
+      await unfreeze(
+        provider,
+        program,
+        payerKeypair,
+        payerKeypair,
+        spl.NATIVE_MINT,
+        sn,
+        account,
+        amount,
+        fee,
+        expiredAt
+      );
+    } catch(e:any) {
+        assert.fail("Expected an error but the transaction failed");
+    }
+
+    // Check program balance change
+    assert.strictEqual(
+      programBalanceBefore.toString(),
+      programBalanceAfter.toString(),
+      "Program balance should be no change"
+    );
+
+    // fail to test the same sn
+    try {
+      await unfreeze(
+        provider,
+        program,
+        payerKeypair,
+        payerKeypair,
+        spl.NATIVE_MINT,
+        sn,
+        account,
+        amount,
+        fee,
+        expiredAt
+      );
+    } catch(e:any) {
+        assert.ok("Expected an error but the transaction failed");
+        assert.strictEqual(e.error.errorCode.code, "AlreadyExecuted");
+    }
+
+    // fail to test invalid fee account
+    // Derive the user token account PDA
+    const [userAccountPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user-token"), bytes32Buffer(account), spl.NATIVE_MINT.toBuffer()],
+      program.programId
+    );
+    try {
+      await unfreezeWithAccount(
+        provider,
+        program,
+        payerKeypair,
+        payerKeypair,
+        spl.NATIVE_MINT,
+        uuid(),
+        account,
+        amount,
+        fee,
+        expiredAt,
+        userAccountPDA,
+        userAccountPDA,
+      );
+    } catch(e:any) {
+      assert.ok("Expected an account error but the transaction failed");
+      assert.strictEqual(e.error.errorCode.code, "ConstraintSeeds");
+      assert.strictEqual(e.error.origin, "fee_token_account");
+    }
+  });
+  
+  it("Freeze and Unfreeze for Token", async () => {
+    const amount = new anchor.BN(LAMPORTS_PER_SOL / 10); // 0.1 SOL
+    const fee = amount.div(new anchor.BN(10)); // 0.01 SOL
+    const account = String(TOKEN_DEPOSIT_ACCOUNT_FILL);
+    // Record balances before freeze
+    const programBalanceBefore = await provider.connection.getBalance(programTokenPDA);
+    console.log("Program Token Balance before freeze:", programBalanceBefore / LAMPORTS_PER_SOL);
+
+    try {
+      await freeze(
+        provider,
+        program,
+        payerKeypair,
+        payerKeypair,
+        mint,
+        uuid(),
+        account,
+        amount,
+        expiredAt
+      );
+    } catch(e:any) {
+        assert.fail("Expected an error but the transaction failed");
+    }
+
+    console.log("Freeze SOL - Program Token PDA:", programSolPDA.toBase58());
+
+    // Record balances after freeze
+    const programBalanceAfter = await provider.connection.getBalance(programTokenPDA);
+    console.log("Program Token Balance after freeze:", programBalanceAfter / LAMPORTS_PER_SOL);
+
+    try {
+      await unfreeze(
+        provider,
+        program,
+        payerKeypair,
+        payerKeypair,
+        mint,
         uuid(),
         account,
         amount,
@@ -784,6 +906,31 @@ describe("payment", () => {
       "Program balance should be no change"
     );
 
+    // fail to test invalid fee account
+    // Derive the user token account PDA
+    const [userAccountPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user-token"), bytes32Buffer(account), mint.toBuffer()],
+      program.programId
+    );
+    try {
+      await unfreezeWithAccount(
+        provider,
+        program,
+        payerKeypair,
+        payerKeypair,
+        mint,
+        uuid(),
+        account,
+        amount,
+        fee,
+        expiredAt,
+        userAccountPDA,
+        userAccountPDA,
+      );
+    } catch(e:any) {
+      assert.ok("Expected an account error but the transaction failed");
+      assert.strictEqual(e.error.errorCode.code, "ConstraintSeeds");
+      assert.strictEqual(e.error.origin, "fee_token_account");
+    }
   });
-  
 });
