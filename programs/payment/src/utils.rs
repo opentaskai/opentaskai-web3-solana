@@ -125,9 +125,6 @@ pub fn transfer_sol<'info>(
         &[bump],
     ];
 
-    msg!("Transfer SOL with seeds: {:?}", seeds);
-    msg!("Bump: {}", bump);
-
     anchor_lang::solana_program::program::invoke_signed(
         &anchor_lang::solana_program::system_instruction::transfer(
             program_token.key,

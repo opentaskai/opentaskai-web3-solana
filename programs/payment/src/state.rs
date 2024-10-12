@@ -17,6 +17,7 @@ impl PaymentState {
 }
 
 #[account]
+#[derive(Debug)]
 #[derive(Default)]
 pub struct UserTokenAccount {
     pub mint: Pubkey,
@@ -38,8 +39,9 @@ impl TransactionRecord {
     pub const LEN: usize = 1;
 }
 
+#[derive(Debug)]
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct TransferData {
+pub struct SettlementData {
     pub from: [u8; 32], // Sender's account number.
     pub to: [u8; 32], // Recipient's account number
     pub available: u64, // Amount deducted from sender's available balance
@@ -50,7 +52,7 @@ pub struct TransferData {
     pub excess_fee: u64, // Additional fee charged if 'paid' exceeds 'frozen', transferred to the fee account
 }
 
-impl TransferData {
+impl SettlementData {
     pub fn to_bytes(&self) -> Vec<u8> {
         [
             &self.from[..],

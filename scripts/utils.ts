@@ -32,7 +32,7 @@ export async function airdrop(payerKeypair: Keypair, connection: Connection, amo
   // Airdrop some SOL to the token creator if needed
   try {
     const balance = await connection.getBalance(payerKeypair.publicKey);
-    console.log("Balance:", balance);
+    console.log(payerKeypair.publicKey.toBase58()," Balance:", balance);
     if (balance < amount) {
       console.log(`Airdropping ${amount} SOL...`);
       const airdropSignature = await connection.requestAirdrop(
@@ -114,6 +114,18 @@ export function parseEventFromTransaction(tx: any, programId: string, instructio
       user: new PublicKey(dataBuffer.slice(120, 152)), // Next 32 bytes for user
     };
   } else if (instruction === 'Transfer') {
+    return {
+      sn: dataBuffer.slice(8, 40), // First 32 bytes for sn
+      token: new PublicKey(dataBuffer.slice(40, 72)), // Next 32 bytes for token
+      from: dataBuffer.slice(72, 104), // Next 32 bytes for from account
+      to: dataBuffer.slice(104, 136), // Next 32 bytes for to account
+      out: new PublicKey(dataBuffer.slice(136, 168)), // Next 32 bytes for recepient
+      fee_user: new PublicKey(dataBuffer.slice(168, 200)), // Next 32 bytes for fee_user
+      amount: dataBuffer.readBigUInt64LE(200), // Next 8 bytes for amount
+      fee: dataBuffer.readBigUInt64LE(208), // Next 8 bytes for fee
+      user: new PublicKey(dataBuffer.slice(216, 248)), // Next 32 bytes for user
+    };
+  } else if (instruction === 'Settlement') {
     return {
       sn: dataBuffer.slice(8, 40), // First 32 bytes for sn
       token: new PublicKey(dataBuffer.slice(40, 72)), // Next 32 bytes for token

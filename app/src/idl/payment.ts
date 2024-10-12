@@ -14,6 +14,33 @@ export type Payment = {
   },
   "instructions": [
     {
+      "name": "changeFeeTo",
+      "discriminator": [
+        4,
+        215,
+        177,
+        253,
+        175,
+        90,
+        205,
+        197
+      ],
+      "accounts": [
+        {
+          "name": "paymentState",
+          "writable": true
+        },
+        {
+          "name": "currentOwner",
+          "signer": true
+        },
+        {
+          "name": "newOwner"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "changeOwner",
       "discriminator": [
         109,
@@ -38,12 +65,7 @@ export type Payment = {
           "name": "newOwner"
         }
       ],
-      "args": [
-        {
-          "name": "newOwner",
-          "type": "pubkey"
-        }
-      ]
+      "args": []
     },
     {
       "name": "changeSigner",
@@ -70,12 +92,7 @@ export type Payment = {
           "name": "newOwner"
         }
       ],
-      "args": [
-        {
-          "name": "newSigner",
-          "type": "pubkey"
-        }
-      ]
+      "args": []
     },
     {
       "name": "deposit",
@@ -617,16 +634,16 @@ export type Payment = {
       "args": []
     },
     {
-      "name": "transfer",
+      "name": "settle",
       "discriminator": [
-        163,
-        52,
-        200,
-        231,
-        140,
-        3,
-        69,
-        186
+        175,
+        42,
+        185,
+        87,
+        144,
+        131,
+        102,
+        212
       ],
       "accounts": [
         {
@@ -840,10 +857,6 @@ export type Payment = {
       ],
       "args": [
         {
-          "name": "out",
-          "type": "pubkey"
-        },
-        {
           "name": "sn",
           "type": {
             "array": [
@@ -856,9 +869,282 @@ export type Payment = {
           "name": "deal",
           "type": {
             "defined": {
-              "name": "transferData"
+              "name": "settlementData"
             }
           }
+        },
+        {
+          "name": "expiredAt",
+          "type": "i64"
+        },
+        {
+          "name": "signature",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "transfer",
+      "discriminator": [
+        163,
+        52,
+        200,
+        231,
+        140,
+        3,
+        69,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "paymentState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  121,
+                  109,
+                  101,
+                  110,
+                  116,
+                  45,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "fromTokenAccount",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  45,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "from"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "toTokenAccount",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  45,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "to"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "feeTokenAccount",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  45,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payment_state.fee_to_account",
+                "account": "paymentState"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "out",
+          "writable": true
+        },
+        {
+          "name": "feeUser",
+          "writable": true
+        },
+        {
+          "name": "programToken",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  45,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  99,
+                  111,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "sn"
+              }
+            ]
+          }
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "associatedTokenProgram",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "instructionSysvar"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "sn",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "from",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "to",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "fee",
+          "type": "u64"
         },
         {
           "name": "expiredAt",
@@ -1367,6 +1653,19 @@ export type Payment = {
       ]
     },
     {
+      "name": "settlementEvent",
+      "discriminator": [
+        48,
+        132,
+        218,
+        111,
+        54,
+        173,
+        61,
+        129
+      ]
+    },
+    {
       "name": "transferEvent",
       "discriminator": [
         100,
@@ -1626,19 +1925,7 @@ export type Payment = {
       }
     },
     {
-      "name": "transactionRecord",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "executed",
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
-      "name": "transferData",
+      "name": "settlementData",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1688,7 +1975,7 @@ export type Payment = {
       }
     },
     {
-      "name": "transferEvent",
+      "name": "settlementEvent",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1753,6 +2040,77 @@ export type Payment = {
           },
           {
             "name": "excessFee",
+            "type": "u64"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "transactionRecord",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "executed",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "transferEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "sn",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "token",
+            "type": "pubkey"
+          },
+          {
+            "name": "from",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "to",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "out",
+            "type": "pubkey"
+          },
+          {
+            "name": "feeUser",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "fee",
             "type": "u64"
           },
           {

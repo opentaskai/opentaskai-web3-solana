@@ -1,6 +1,9 @@
 # lib.rs
 When modifying the #[instruction(...)] attribute, ensure that the order and presence of parameters match what the client sends. You can remove unused parameters from the end, but be cautious about removing or reordering parameters in the middle. This will help avoid errors related to parameter mismatches.
 
+Multiple init_if_needed Accounts might be problematic.
+If multiple accounts are derived using the same seed prefix, it can lead to conflicts in PDA derivation. Each account must have a unique PDA derived from its seeds. If two accounts are initialized with the same seed prefix, it can cause unexpected behavior.
+
 # Use custom programId
 
 ```

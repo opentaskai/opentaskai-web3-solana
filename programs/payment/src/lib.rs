@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token};
 use anchor_spl::associated_token::AssociatedToken;
-use crate::state::{PaymentState, UserTokenAccount, TransactionRecord, TransferData};
+use crate::state::{PaymentState, UserTokenAccount, TransactionRecord, SettlementData};
 
 declare_id!("7mEtBse9oundTRfuYNTmPBaYr1gGNM5sewKDo23meJXe");
 
@@ -25,12 +25,16 @@ pub mod payment {
         admin::initialize_program_token(ctx)
     }
 
-    pub fn change_owner(ctx: Context<ChangeOwner>, new_owner: Pubkey) -> Result<()> {
-        admin::change_owner(ctx, new_owner)
+    pub fn change_owner(ctx: Context<ChangeOwner>) -> Result<()> {
+        admin::change_owner(ctx)
     }
 
-    pub fn change_signer(ctx: Context<ChangeOwner>, new_signer: Pubkey) -> Result<()> {
-        admin::change_signer(ctx, new_signer)
+    pub fn change_signer(ctx: Context<ChangeOwner>) -> Result<()> {
+        admin::change_signer(ctx)
+    }
+
+    pub fn change_fee_to(ctx: Context<ChangeOwner>) -> Result<()> {
+        admin::change_fee_to(ctx)
     }
 
     pub fn deposit(
@@ -72,8 +76,8 @@ pub mod payment {
         ctx: Context<Unfreeze>,
         sn: [u8; 32],
         account: [u8; 32],
-        amount: u64,
-        fee: u64,
+        amount: u64, // amount to unfreeze
+        fee: u64,  // fee to deduct, from amount
         expired_at: i64,
         signature: [u8; 64],
     ) -> Result<()> {
@@ -82,13 +86,25 @@ pub mod payment {
 
     pub fn transfer(
         ctx: Context<Transfer>,
-        out: Pubkey,
         sn: [u8; 32],
-        deal: TransferData,
+        from: [u8; 32],
+        to: [u8; 32],
+        amount: u64, // amount to transfer
+        fee: u64, // fee to deduct, from amount
         expired_at: i64,
         signature: [u8; 64],
     ) -> Result<()> {
-        transfer::handler(ctx, out, sn, deal, expired_at, signature)
+        transfer::handler(ctx, sn, from, to, amount, fee, expired_at, signature)
+    }
+
+    pub fn settle(
+        ctx: Context<Settlement>,
+        sn: [u8; 32],
+        deal: SettlementData,
+        expired_at: i64,
+        signature: [u8; 64],
+    ) -> Result<()> {
+        settle::handler(ctx, sn, deal, expired_at, signature)
     }
 }
 
@@ -146,7 +162,6 @@ pub struct ChangeOwner<'info> {
     /// CHECK: This is the new owner
     pub new_owner: UncheckedAccount<'info>,
 }
-
 
 #[derive(Accounts)]
 #[instruction(sn: [u8; 32], account: [u8; 32])]
@@ -327,14 +342,72 @@ pub struct Unfreeze<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(sn: [u8; 32], deal: TransferData)]
+#[instruction(sn: [u8; 32], from: [u8; 32], to: [u8; 32])]
 pub struct Transfer<'info> {
     #[account(mut, seeds = [b"payment-state"], bump)]
     pub payment_state: Account<'info, PaymentState>,
     #[account(
+        mut,
+        seeds = [b"user-token", from.as_ref(), mint.key().as_ref()],
+        bump
+    )]
+    pub from_token_account: Account<'info, UserTokenAccount>,
+    #[account(
         init_if_needed,
         payer = user,
         space = 8 + UserTokenAccount::LEN,
+        seeds = [b"user-token", to.as_ref(), mint.key().as_ref()],
+        bump
+    )]
+    pub to_token_account: Account<'info, UserTokenAccount>,
+    #[account(
+        mut,
+        seeds = [b"user-token", payment_state.fee_to_account.as_ref(), mint.key().as_ref()],
+        bump
+    )]
+    pub fee_token_account: Account<'info, UserTokenAccount>,
+    #[account(mut)]
+    pub user: Signer<'info>,
+    /// CHECK: This account is checked in the instruction handler
+    pub mint: UncheckedAccount<'info>,
+    /// CHECK: This account is checked in the instruction
+    #[account(mut)]
+    pub out: UncheckedAccount<'info>,
+    /// CHECK: This account is checked in the instruction
+    #[account(mut, constraint = fee_user.key() == payment_state.fee_to)]
+    pub fee_user: UncheckedAccount<'info>,
+    /// CHECK: This account is checked in the instruction
+    #[account(
+        mut,
+        seeds = [b"program-token", mint.key().as_ref()],
+        bump,
+        owner = if *mint.key == anchor_spl::token::spl_token::native_mint::id() { system_program.key() } else { token_program.key() }
+    )]
+    pub program_token: UncheckedAccount<'info>,
+    #[account(
+        init_if_needed,
+        payer = user,
+        space = 8 + TransactionRecord::LEN,
+        seeds = [b"record", sn.as_ref()],
+        bump
+    )]
+    pub record: Account<'info, TransactionRecord>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    /// CHECK: This account is used to verify the Ed25519 instruction
+    pub instruction_sysvar: AccountInfo<'info>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
+
+#[derive(Accounts)]
+#[instruction(sn: [u8; 32], deal: SettlementData)]
+pub struct Settlement<'info> {
+    #[account(mut, seeds = [b"payment-state"], bump)]
+    pub payment_state: Account<'info, PaymentState>,
+    #[account(
+        mut,
         seeds = [b"user-token", deal.from.as_ref(), mint.key().as_ref()],
         bump
     )]

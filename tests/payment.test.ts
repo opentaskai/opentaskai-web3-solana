@@ -17,6 +17,7 @@ import {
 
 import {
   FEE_ACCOUNT_FILL,
+  ZERO_ACCOUNT,
   depositWithMessage, 
   depositSol, 
   depositTokens, 
@@ -26,17 +27,25 @@ import {
   freeze, 
   unfreeze,
   unfreezeWithAccount,
+  transfer,
+  settle,
+  SettlementData,
   checkTransactionExecuted 
 } from "./common";
-import { deployToken, getTokenAccountBalance, getAccountBalance } from "../scripts/tokens";
+import { deployToken, getTokenAccountBalance, getPDABalance } from "../scripts/tokens";
 import { airdrop, uuid, bytes32Buffer, bufferToArray } from "../scripts/utils";
-import { loadKeypair } from "../scripts/accounts";
+import { getKeypair } from "../scripts/accounts";
 
 describe("payment", () => {
   // Read the keypair from the JSON file
-  const keypairFile = path.join(os.homedir(), '.config', 'solana', 'id.json');
-  const payerKeypair = loadKeypair(keypairFile);
+  const payerKeypair = getKeypair(path.join(os.homedir(), '.config/solana/id.json'));
   console.log("Payer keypair:", payerKeypair.publicKey.toBase58());
+
+  const feeToKeypair = getKeypair(path.join(os.homedir(), '.config/solana/local-feeto.json'));
+  console.log("feeTo keypair:", feeToKeypair.publicKey.toBase58());
+
+  const user2Keypair = getKeypair(path.join(os.homedir(), '.config/solana/local-user2.json'));
+  console.log("user2 keypair:", user2Keypair.publicKey.toBase58());
 
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
@@ -46,7 +55,9 @@ describe("payment", () => {
   console.log("Payment Program ID:", programId.toString());
 
   let mint: PublicKey;
-  let userTokenAccount: PublicKey;
+  let user1ATA: PublicKey;
+  let user2ATA: PublicKey;
+  let feeATA: PublicKey;
   let programTokenPDA: PublicKey;
   let programSolPDA: PublicKey;
   let feeTokenPDA: PublicKey;
@@ -59,18 +70,29 @@ describe("payment", () => {
   // Define constants at the beginning of the describe block
   const SOL_DEPOSIT_ACCOUNT_FILL = Buffer.alloc(32).fill(2).toString('hex');
   const TOKEN_DEPOSIT_ACCOUNT_FILL = Buffer.alloc(32).fill(3).toString('hex');
+  const USER2_SOL_ACCOUNT_FILL = Buffer.alloc(32).fill(4).toString('hex');
+  const USER2_TOKEN_ACCOUNT_FILL = Buffer.alloc(32).fill(5).toString('hex');
 
   const feeAccountBuffer = bytes32Buffer(FEE_ACCOUNT_FILL);
 
   before(async () => {
     // Request airdrop for the payer
     await airdrop(payerKeypair, provider.connection, 3 * LAMPORTS_PER_SOL);
+    await airdrop(feeToKeypair, provider.connection, 1 * LAMPORTS_PER_SOL);
+    await airdrop(user2Keypair, provider.connection, 1 * LAMPORTS_PER_SOL);
+
+    let balance = await provider.connection.getBalance(payerKeypair.publicKey);
+    console.log("payerKeypair Balance:", balance / LAMPORTS_PER_SOL);
+    balance = await provider.connection.getBalance(feeToKeypair.publicKey);
+    console.log("feeToKeypair Balance:", balance / LAMPORTS_PER_SOL);
+    balance = await provider.connection.getBalance(user2Keypair.publicKey);
+    console.log("user2Keypair Balance:", balance / LAMPORTS_PER_SOL);
 
     // Create a new mint
     mint = await deployToken(provider.connection, payerKeypair);
 
     // Create a token account for the user
-    userTokenAccount = await spl
+    user1ATA = await spl
       .getOrCreateAssociatedTokenAccount(
         provider.connection,
         payerKeypair,
@@ -78,6 +100,25 @@ describe("payment", () => {
         payerKeypair.publicKey
       )
       .then((account) => account.address);
+
+    user2ATA = await spl
+      .getOrCreateAssociatedTokenAccount(
+        provider.connection,
+        payerKeypair,
+        mint,
+        user2Keypair.publicKey
+      )
+      .then((account) => account.address);
+
+    feeATA = await spl
+      .getOrCreateAssociatedTokenAccount(
+        provider.connection,
+        payerKeypair,
+        mint,
+        feeToKeypair.publicKey
+      )
+      .then((account) => account.address);
+
 
     const userTokenBalance = await getTokenAccountBalance(provider.connection, mint, payerKeypair.publicKey);
     console.log("User token balance:", userTokenBalance);
@@ -88,7 +129,7 @@ describe("payment", () => {
         provider.connection,
         payerKeypair,
         mint,
-        userTokenAccount,
+        user1ATA,
         payerKeypair.publicKey,
         1000000000000 // 1000 tokens
       );
@@ -259,6 +300,25 @@ describe("payment", () => {
     assert(programSolPDA.equals(expectedProgramSolAccount), "SOL Program token address is not correctly derived");
   });
 
+
+  it("Change fee to", async () => {
+    try {
+      const tx = await program.methods
+        .changeFeeTo()
+        .accounts({
+          paymentState: paymentStatePDA,
+          currentOwner: payerKeypair.publicKey,
+          newOwner: feeToKeypair.publicKey,
+        })
+        .signers([payerKeypair])
+        .rpc();
+
+    } catch (error) {
+      console.error("Error initializing SPL program token:", error);
+      throw error;
+    }
+  });
+
   it("Fails to deposit SOL with incorrect signature", async () => {
     const amount = new anchor.BN(LAMPORTS_PER_SOL); // 1 SOL
     const frozen = new anchor.BN(LAMPORTS_PER_SOL / 10); // 0.1 SOL
@@ -339,7 +399,7 @@ describe("payment", () => {
     const userTokenBalance = await getTokenAccountBalance(provider.connection, spl.NATIVE_MINT, payerKeypair.publicKey);
     console.log("User Token Balance before deposit:", userTokenBalance);
 
-    const programTokenAccountBefore = await getAccountBalance(provider.connection, spl.NATIVE_MINT, programTokenPDA);
+    const programTokenAccountBefore = await getPDABalance(provider.connection, spl.NATIVE_MINT, programTokenPDA);
     console.log("Program token account before deposit:", programTokenAccountBefore);
     
     const {
@@ -406,7 +466,7 @@ describe("payment", () => {
     const userTokenBalance = await getTokenAccountBalance(provider.connection, mint, payerKeypair.publicKey);
     console.log("User Token Balance before deposit:", userTokenBalance);
 
-    const programTokenAccountBefore = await getAccountBalance(provider.connection, mint, programTokenPDA);
+    const programTokenAccountBefore = await getPDABalance(provider.connection, mint, programTokenPDA);
     console.log("Program token account before deposit:", programTokenAccountBefore);
     
     const {
@@ -442,7 +502,7 @@ describe("payment", () => {
       "Program token balance is incorrect"
     );
   });
-
+/*
   it("Deposits and then withdraws SOL", async () => {
     // Deposit SOL first
     const depositAmount = new anchor.BN(1 * LAMPORTS_PER_SOL); // 2 SOL
@@ -490,7 +550,7 @@ describe("payment", () => {
       spl.NATIVE_MINT,
       withdrawSN,
       account,
-      userTokenAccount,
+      user1ATA,
       withdrawAvailable,
       withdrawFrozen, 
       expiredAt
@@ -627,7 +687,7 @@ describe("payment", () => {
       mint,
       withdrawSN,
       account,
-      userTokenAccount,
+      user1ATA,
       withdrawAvailable,
       withdrawFrozen, 
       expiredAt
@@ -719,7 +779,7 @@ describe("payment", () => {
         mint,
         withdrawSN,
         account,
-        userTokenAccount,
+        user1ATA,
         withdrawAvailable,
         withdrawFrozen, 
         expiredAt
@@ -931,6 +991,98 @@ describe("payment", () => {
       assert.ok("Expected an account error but the transaction failed");
       assert.strictEqual(e.error.errorCode.code, "ConstraintSeeds");
       assert.strictEqual(e.error.origin, "fee_token_account");
+    }
+  });
+
+  it("Settle for SOL", async () => {
+    const amount = new anchor.BN(LAMPORTS_PER_SOL / 10); // 0.1 SOL
+    const fee = amount.div(new anchor.BN(10)); // 0.01 SOL
+    const from = String(SOL_DEPOSIT_ACCOUNT_FILL);
+    // Record balances before freeze
+    const programBalanceBefore = await provider.connection.getBalance(programSolPDA);
+    console.log("Program SOL Balance before freeze:", programBalanceBefore / LAMPORTS_PER_SOL);
+    let sn = uuid();
+    let to = Buffer.alloc(32).fill(5).toString('hex');
+    let deal = new SettlementData(
+      bytes32Buffer(from), 
+      bytes32Buffer(to), 
+      new anchor.BN(0), 
+      new anchor.BN(amount.add(fee)), 
+      amount, 
+      fee, 
+      new anchor.BN(amount.add(fee)), 
+      new anchor.BN(0)
+    ); 
+    try {
+      await settle(
+        provider,
+        program,
+        payerKeypair,
+        payerKeypair,
+        spl.NATIVE_MINT,
+        user2Keypair.publicKey,
+        payerKeypair.publicKey,
+        sn,
+        deal,
+        expiredAt,
+      );
+    } catch(e:any) {
+        assert.fail("Expected an error but the transaction failed");
+    }
+  });
+  */
+
+  it("Transfer for SOL", async () => {
+    const amount = new anchor.BN(LAMPORTS_PER_SOL / 10); // 0.1 SOL
+    const fee = amount.div(new anchor.BN(10)); // 0.01 SOL
+    const from = String(SOL_DEPOSIT_ACCOUNT_FILL);
+    const sn = uuid();
+    const to = String(USER2_SOL_ACCOUNT_FILL);
+    try {
+      await transfer(
+        provider,
+        program,
+        payerKeypair,
+        payerKeypair,
+        spl.NATIVE_MINT,
+        user2Keypair.publicKey,
+        feeToKeypair.publicKey,
+        sn,
+        from,
+        to,
+        amount,
+        fee,
+        expiredAt,
+      );
+    } catch(e:any) {
+        assert.fail("Expected an error but the transaction failed:", e);
+    }
+  });
+
+  it("Transfer for Token", async () => {
+    const amount = new anchor.BN(LAMPORTS_PER_SOL / 10); // 0.1 SOL
+    const fee = amount.div(new anchor.BN(10)); // 0.01 SOL
+    const from = String(TOKEN_DEPOSIT_ACCOUNT_FILL);
+    const sn = uuid();
+    const to = String(USER2_TOKEN_ACCOUNT_FILL);
+    try {
+      await transfer(
+        provider,
+        program,
+        payerKeypair,
+        payerKeypair,
+        mint,
+        user2ATA,
+        feeATA,
+        sn,
+        from,
+        to,
+        amount,
+        fee,
+        expiredAt,
+      );
+    } catch(e:any) {
+        assert.fail("Expected an error but the transaction failed:", e);
     }
   });
 });

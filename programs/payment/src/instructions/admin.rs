@@ -27,14 +27,20 @@ pub fn initialize_program_token(ctx: Context<InitializeProgramToken>) -> Result<
     Ok(())
 }
 
-pub fn change_owner(ctx: Context<ChangeOwner>, new_owner: Pubkey) -> Result<()> {
+pub fn change_owner(ctx: Context<ChangeOwner>) -> Result<()> {
     require!(ctx.accounts.current_owner.key() == ctx.accounts.payment_state.owner, ErrorCode::Unauthorized);
-    ctx.accounts.payment_state.owner = new_owner;
+    ctx.accounts.payment_state.owner = ctx.accounts.new_owner.key();
     Ok(())
 }
 
-pub fn change_signer(ctx: Context<ChangeOwner>, new_signer: Pubkey) -> Result<()> {
+pub fn change_signer(ctx: Context<ChangeOwner>) -> Result<()> {
     require!(ctx.accounts.current_owner.key() == ctx.accounts.payment_state.owner || ctx.accounts.current_owner.key() == ctx.accounts.payment_state.signer, ErrorCode::Unauthorized);
-    ctx.accounts.payment_state.signer = new_signer;
+    ctx.accounts.payment_state.signer = ctx.accounts.new_owner.key();
+    Ok(())
+}
+
+pub fn change_fee_to(ctx: Context<ChangeOwner>) -> Result<()> {
+    require!(ctx.accounts.current_owner.key() == ctx.accounts.payment_state.owner || ctx.accounts.current_owner.key() == ctx.accounts.payment_state.fee_to, ErrorCode::Unauthorized);
+    ctx.accounts.payment_state.fee_to = ctx.accounts.new_owner.key();
     Ok(())
 }

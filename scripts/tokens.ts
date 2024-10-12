@@ -50,6 +50,7 @@ export async function deployToken(connection: web3.Connection, payerKeypair: web
 
 export async function getTokenAccountBalance(connection: web3.Connection, mint: web3.PublicKey, owner: web3.PublicKey) {
   try {
+    // Check if the mint is the native SOL mint
     if (mint.toBase58() === token.NATIVE_MINT.toBase58()) {
       const balance = await connection.getBalance(owner);
       return BigInt(balance);
@@ -75,14 +76,16 @@ export async function getTokenAccountBalance(connection: web3.Connection, mint: 
   }
 }
 
-export async function getAccountBalance(connection: web3.Connection, mint: web3.PublicKey, owner: web3.PublicKey) {
+export async function getPDABalance(connection: web3.Connection, mint: web3.PublicKey, pda: web3.PublicKey) {
   try {
-      if(mint.toBase58() === token.NATIVE_MINT.toBase58()) {
-      const balance = await connection.getBalance(owner);
+    // Check if the mint is the native SOL mint
+    if(mint.toBase58() === token.NATIVE_MINT.toBase58()) {
+      const balance = await connection.getBalance(pda);
       console.log("SOL Balance:", balance);
       return BigInt(balance);
     } else {
-      const balance = await token.getAccount(connection, owner);
+      // Fetch the token account associated with the PDA
+      const balance = await token.getAccount(connection, pda);
       console.log("Token Balance:", balance);
       return BigInt(balance.amount);
     }
@@ -92,7 +95,7 @@ export async function getAccountBalance(connection: web3.Connection, mint: web3.
       return 0;
     } else {
       // Re-throw other errors
-      console.error("getAccountBalance Error:", error);
+      console.error("getPDABalance Error:", error);
       throw error;
     }
   }

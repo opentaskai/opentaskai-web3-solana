@@ -30,6 +30,14 @@ export function loadKeypair(keypairPath:string) {
   return keypair;
 }
 
+export function getKeypair(keypairPath:string) {
+  if(fs.existsSync(keypairPath)) {
+    return loadKeypair(keypairPath);
+  } else {
+    return Keypair.generate();
+  }
+}
+
 export function getBase58PublicKey(keypairPath:string) {
   const keypair = loadKeypair(keypairPath);
   return keypair.publicKey.toBase58();

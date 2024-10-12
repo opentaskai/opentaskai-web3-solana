@@ -49,6 +49,19 @@ pub struct TransferEvent {
     pub to: [u8; 32],
     pub out: Pubkey,
     pub fee_user: Pubkey,
+    pub amount: u64,
+    pub fee: u64,
+    pub user: Pubkey,
+}
+
+#[event]
+pub struct SettlementEvent {
+    pub sn: [u8; 32],
+    pub token: Pubkey,
+    pub from: [u8; 32],
+    pub to: [u8; 32],
+    pub out: Pubkey,
+    pub fee_user: Pubkey,
     pub available: u64,
     pub frozen: u64,
     pub amount: u64,

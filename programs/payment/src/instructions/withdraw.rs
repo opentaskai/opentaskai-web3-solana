@@ -41,7 +41,7 @@ pub fn handler(
         user_token_account.mint = ctx.accounts.mint.key();
     }
 
-    // Transfer tokens
+    // Settlement tokens
     let total_amount = available.checked_add(frozen).unwrap();
 
     if ctx.accounts.mint.key() == anchor_spl::token::spl_token::native_mint::id() {

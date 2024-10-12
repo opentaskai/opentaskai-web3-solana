@@ -5,3 +5,4 @@ pub mod withdraw;
 pub mod freeze;
 pub mod unfreeze;
 pub mod transfer;
+pub mod settle;
