@@ -168,3 +168,20 @@ pub fn transfer_token<'info>(
     )?;
     Ok(())
 }
+
+// Public function to get the owner of the associated token account
+pub fn get_ata_owner<'info>(user_account_info: &AccountInfo<'info>) -> Result<Pubkey> {
+    let user_token_data = user_account_info.try_borrow_data()?; 
+
+    // Extract the owner from the token account data
+    let owner = Pubkey::try_from(&user_token_data[32..64])
+        .map_err(|_| anchor_lang::error::Error::from(ErrorCode::InvalidATAOwner))?; // Use fully qualified path for conversion
+
+    Ok(owner) // Return the owner
+}
+
+// Public function to get the owner of the associated token account from an UncheckedAccount
+pub fn get_ata_owner_from_unchecked_account<'info>(ata_account: &UncheckedAccount<'info>) -> Result<Pubkey> {
+    let user_account_info = ata_account.to_account_info(); 
+    get_ata_owner(&user_account_info) // Pass a reference to user_account_info
+}

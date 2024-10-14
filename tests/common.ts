@@ -355,6 +355,7 @@ export async function withdraw(
 
   // Create and sign the message
   const message = Buffer.concat([
+    to.toBuffer(),
     snBuffer,
     accountBuffer,
     available.toArrayLike(Buffer, 'le', 8),
@@ -816,6 +817,8 @@ export async function transferWitchAccount(
 
   // Create and sign the message
   const message = Buffer.concat([
+    out.toBuffer(),
+    feeUser.toBuffer(),
     snBuffer,
     fromBuffer,
     toBuffer,
@@ -953,9 +956,6 @@ export async function transfer(
   const feeUserBalanceBefore = await getPDABalance(provider.connection, mint, feeUser);
   console.log("feeUserBalanceBefore before:", feeUserBalanceBefore);
 
-  let balance = await provider.connection.getBalance(payerKeypair.publicKey);
-  console.log("user(payer) sol Balance:", balance / LAMPORTS_PER_SOL);
-
   const tx = await transferWitchAccount(
     provider, 
     program, 
@@ -1005,7 +1005,7 @@ export async function transfer(
     if(mint.toBase58() === spl.NATIVE_MINT.toBase58()) {
       assert.strictEqual(fromTokenAccountInfoAfter.available.lte(fromTokenAccountInfoBefore.available.sub(amount)), true, "from token account available doesn't match");
     } else {
-      assert.strictEqual(fromTokenAccountInfoAfter.available.toString(), fromTokenAccountInfoBefore.available.toString(), "from token account available doesn't match");
+      assert.strictEqual(fromTokenAccountInfoAfter.available.toString(), fromTokenAccountInfoBefore.available.sub(amount).toString(), "from token account available doesn't match");
       assert.strictEqual(fromBalanceAfter.toString(), fromBalanceBefore.toString(), "from token account balance doesn't match");
     }
     assert.strictEqual(toTokenAccountInfoAfter.available.toString(), toTokenAccountInfoBefore.available.toString(), "to token account available doesn't match");
@@ -1020,9 +1020,11 @@ export async function transfer(
   const txDetails = await provider.connection.getTransaction(tx, { commitment: 'confirmed' });
   const eventLog = parseEventFromTransaction(txDetails, program.programId.toBase58(), 'Transfer');
   console.log("Parsed TransferEvent:", eventLog);
+  // console.log("txDetails:", JSON.stringify(txDetails));
 }
 
-export async function settle(
+
+export async function settleWithAccount(
   provider: anchor.AnchorProvider,
   program: Program<Payment>,
   payerKeypair: Keypair,
@@ -1032,7 +1034,10 @@ export async function settle(
   feeUser: PublicKey,
   sn: string,
   deal: SettlementData,
-  expiredAt: anchor.BN
+  expiredAt: anchor.BN,
+  fromTokenAccountPDA: PublicKey | undefined,
+  toTokenAccountPDA: PublicKey | undefined,
+  feeTokenAccountPDA: PublicKey | undefined,
 ) {
   const snBuffer = bytes32Buffer(sn);
 
@@ -1043,26 +1048,32 @@ export async function settle(
   );
 
   // Derive the from token account PDA
-  const [fromTokenAccountPDA] = PublicKey.findProgramAddressSync(
-    [Buffer.from("user-token"), deal.from, mint.toBuffer()],
-    program.programId
-  );
+  if (!fromTokenAccountPDA) {
+    [fromTokenAccountPDA] = PublicKey.findProgramAddressSync(
+        [Buffer.from("user-token"), deal.from, mint.toBuffer()],
+      program.programId
+    );
+  }
 
   console.log("Derived fromTokenAccountPDA:", fromTokenAccountPDA.toBase58());
 
   // Derive the to token account PDA
-  const [toTokenAccountPDA] = PublicKey.findProgramAddressSync(
-    [Buffer.from("user-token"), deal.to, mint.toBuffer()],
-    program.programId
-  );
+  if (!toTokenAccountPDA) {
+    [toTokenAccountPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user-token"), deal.to, mint.toBuffer()],
+      program.programId
+    );
+  }
 
   console.log("Derived toTokenAccountPDA:", toTokenAccountPDA.toBase58());
 
   // Derive the fee token account PDA
-  const [feeTokenAccountPDA] = PublicKey.findProgramAddressSync(
-    [Buffer.from("user-token"), bytes32Buffer(FEE_ACCOUNT_FILL), mint.toBuffer()],
-    program.programId
-  );
+  if (!feeTokenAccountPDA) {      
+    [feeTokenAccountPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user-token"), bytes32Buffer(FEE_ACCOUNT_FILL), mint.toBuffer()],
+      program.programId
+    );
+  }
 
   // Derive the program token account PDA
   const [programTokenPDA] = PublicKey.findProgramAddressSync(
@@ -1089,26 +1100,13 @@ export async function settle(
 
   // Create and sign the message
   const message = Buffer.concat([
-    // out.toBuffer(),
+    out.toBuffer(),
+    feeUser.toBuffer(),
     snBuffer,
     deal.toBytes(),
     expiredAt.toArrayLike(Buffer, 'le', 8)
   ]);
 
-  console.log("out pubkey:", out.toBase58());
-  console.log("Seed 1 (user-token):", Buffer.from("user-token").toString('hex'));
-  console.log("Seed 2 (from):", deal.from.toString('hex'));
-  console.log("Seed 3 (mint):", mint.toBase58());
-
-  console.log("From Token Account PDA:", fromTokenAccountPDA.toBase58());
-  console.log("To Token Account PDA:", toTokenAccountPDA.toBase58());
-  console.log("Out Account:", out.toBase58());
-  console.log("feeUser Account:", feeUser.toBase58());
-  console.log("Deal:", deal);
-  console.log("Serialized Deal:", deal.toBytes().toString('hex'));
-
-  let balance = await provider.connection.getBalance(payerKeypair.publicKey);
-  console.log("user sol Balance:", balance / LAMPORTS_PER_SOL);
 
   try {
     const signature = signMessageForEd25519(message, signerKeypair);
@@ -1150,11 +1148,6 @@ export async function settle(
       throw new Error("Transaction failed");
     }
 
-    // Fetch the transaction details to get the events
-    const txDetails = await provider.connection.getTransaction(tx, { commitment: 'confirmed' });
-    const eventLog = parseEventFromTransaction(txDetails, program.programId.toBase58(), 'Settlement');
-    console.log("Parsed SettlementEvent:", eventLog);
-
     return tx;
   } catch (error) {
     console.error("Settlement Token Error details:", error);
@@ -1167,6 +1160,137 @@ export async function settle(
     }
     throw error;
   }
+}
+
+export async function settle(
+  provider: anchor.AnchorProvider,
+  program: Program<Payment>,
+  payerKeypair: Keypair,
+  signerKeypair: Keypair,
+  mint: PublicKey,
+  out: PublicKey,
+  feeUser: PublicKey,
+  sn: string,
+  deal: SettlementData,
+  expiredAt: anchor.BN
+) {
+  
+  // Derive the from token account PDA
+  const [fromTokenAccountPDA] = PublicKey.findProgramAddressSync(
+    [Buffer.from("user-token"), deal.from, mint.toBuffer()],
+    program.programId
+  );
+
+  // Derive the to token account PDA
+  const [toTokenAccountPDA] = PublicKey.findProgramAddressSync(
+    [Buffer.from("user-token"), deal.to, mint.toBuffer()],
+    program.programId
+  );
+
+  // Derive the fee token account PDA
+  const [feeTokenAccountPDA] = PublicKey.findProgramAddressSync(
+    [Buffer.from("user-token"), bytes32Buffer(FEE_ACCOUNT_FILL), mint.toBuffer()],
+    program.programId
+  );
+
+  // Derive the program token account PDA
+  const [programTokenPDA] = PublicKey.findProgramAddressSync(
+    [Buffer.from("program-token"), mint.toBuffer()],
+    program.programId
+  );
+
+  const fromTokenAccountInfoBefore = await program.account.userTokenAccount.fetch(fromTokenAccountPDA);
+  showUserTokenAccount(fromTokenAccountInfoBefore, fromTokenAccountPDA, "from Account Info token before: ");
+
+  let toTokenAccountInfoBefore: any;
+  try {
+    toTokenAccountInfoBefore = await program.account.userTokenAccount.fetch(toTokenAccountPDA);
+    showUserTokenAccount(toTokenAccountInfoBefore, toTokenAccountPDA, "to Account Info token before: ");
+  } catch (error) {
+    console.error("to Token Account Info Error details:", error.message);
+    toTokenAccountInfoBefore = {
+      available: new anchor.BN(0),
+      frozen: new anchor.BN(0),
+    }
+  }
+
+  const feeTokenAccountInfoBefore = await program.account.userTokenAccount.fetch(feeTokenAccountPDA);
+  showUserTokenAccount(feeTokenAccountInfoBefore, feeTokenAccountPDA, "fee Account Info token before: ");
+
+  const programTokenBlanceBefore = await getPDABalance(provider.connection, mint, programTokenPDA);
+  console.log("programTokenBlanceBefore before:", programTokenBlanceBefore);
+
+  const fromBalanceBefore = await getTokenAccountBalance(provider.connection, mint, payerKeypair.publicKey);
+  console.log("fromBalanceBefore before:", fromBalanceBefore);
+
+  const outBalanceBefore = await getPDABalance(provider.connection, mint, out);
+  console.log("outBalanceBefore before:", outBalanceBefore);
+
+  const feeUserBalanceBefore = await getPDABalance(provider.connection, mint, feeUser);
+  console.log("feeUserBalanceBefore before:", feeUserBalanceBefore);
+
+  const tx = await settleWithAccount(
+    provider, 
+    program, 
+    payerKeypair, 
+    signerKeypair, 
+    mint, 
+    out, 
+    feeUser, 
+    sn, 
+    deal, 
+    expiredAt, 
+    fromTokenAccountPDA, toTokenAccountPDA, feeTokenAccountPDA
+  ); 
+
+  const fromTokenAccountInfoAfter = await program.account.userTokenAccount.fetch(fromTokenAccountPDA);
+  showUserTokenAccount(fromTokenAccountInfoAfter, fromTokenAccountPDA, "from Account Info token after: ");
+
+  const toTokenAccountInfoAfter = await program.account.userTokenAccount.fetch(toTokenAccountPDA);
+  showUserTokenAccount(toTokenAccountInfoAfter, toTokenAccountPDA, "to Account Info token after: ");
+
+  const feeTokenAccountInfoAfter = await program.account.userTokenAccount.fetch(feeTokenAccountPDA);
+  showUserTokenAccount(feeTokenAccountInfoAfter, feeTokenAccountPDA, "fee Account Info token after: ");
+
+
+  const programTokenBlanaceAfter = await getPDABalance(provider.connection, mint, programTokenPDA);
+  console.log("programTokenBlanaceAfter after:", programTokenBlanaceAfter);
+
+  const fromBalanceAfter = await getTokenAccountBalance(provider.connection, mint, payerKeypair.publicKey);
+  console.log("fromBalanceAfter after:", fromBalanceAfter);
+
+  const outBalanceAfter = await getPDABalance(provider.connection, mint, out);
+  console.log("outBalanceAfter after:", outBalanceAfter);
+
+  const feeUserBalanceAfter = await getPDABalance(provider.connection, mint, feeUser);
+  console.log("feeUserBalanceAfter after:", feeUserBalanceAfter);
+
+  assert.strictEqual(fromTokenAccountInfoAfter.available.toString(), fromTokenAccountInfoBefore.available.sub(deal.available).toString(), "from token account available doesn't match");
+  assert.strictEqual(fromTokenAccountInfoAfter.frozen.toString(), fromTokenAccountInfoBefore.frozen.sub(deal.frozen).toString(), "from token account froze doesn't match");
+  // if transfer to zero account, only inner transfer, else transfer to out account and fee account
+  if(out.toBase58() === ZERO_ACCOUNT.toBase58()) {
+    assert.strictEqual(toTokenAccountInfoAfter.available.toString(), toTokenAccountInfoBefore.available.add(deal.amount).toString(), "to token account available doesn't match");
+    assert.strictEqual(feeTokenAccountInfoAfter.available.toString(), feeTokenAccountInfoBefore.available.add(deal.fee).toString(), "fee token account available doesn't match");
+  } else {
+    if(mint.toBase58() === spl.NATIVE_MINT.toBase58()) {
+      assert.strictEqual(fromTokenAccountInfoAfter.available.lte(fromTokenAccountInfoBefore.available), true, "from token account available doesn't match");
+      assert.strictEqual(toTokenAccountInfoAfter.available.toString(), toTokenAccountInfoBefore.available.toString(), "to token account available doesn't match");
+      assert.strictEqual(feeTokenAccountInfoAfter.available.toString(), feeTokenAccountInfoBefore.available.toString(), "fee token account available doesn't match");
+    } else {
+      assert.strictEqual(fromBalanceAfter.toString(), fromBalanceBefore.toString(), "from token account balance doesn't match");
+    }
+    
+    
+    // assert.strictEqual(programTokenBlanaceAfter, BigInt(programTokenBlanceBefore) - BigInt(amount.toString()), "program token account balance doesn't match");
+    // assert.strictEqual(outBalanceAfter.toString(), amount.sub(fee).add(new anchor.BN(outBalanceBefore.toString())).toString(), "out token account balance doesn't match");
+    // assert.strictEqual(feeUserBalanceAfter.toString(), fee.add(new anchor.BN(feeUserBalanceBefore.toString())).toString(), "fee token account balance doesn't match");
+  }
+    
+  // Fetch the transaction details to get the events
+  const txDetails = await provider.connection.getTransaction(tx, { commitment: 'confirmed' });
+  const eventLog = parseEventFromTransaction(txDetails, program.programId.toBase58(), 'Settle');
+  console.log("Parsed SettleEvent:", eventLog);
+  // console.log("txDetails:", JSON.stringify(txDetails));
 }
 
 export class SettlementData {

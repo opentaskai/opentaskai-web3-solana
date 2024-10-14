@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
-use crate::utils::{verify_ed25519_instruction, transfer_sol, transfer_token};
+use crate::utils::{verify_ed25519_instruction, transfer_sol, transfer_token, get_ata_owner_from_unchecked_account};
 use crate::errors::ErrorCode;
-use crate::events::SettlementEvent;
+use crate::events::SettleEvent;
 use crate::Settlement;
 use crate::state::{SettlementData};
 use solana_program::pubkey::Pubkey;
@@ -52,13 +52,20 @@ pub fn handler(
     );
 
     msg!("out pubkey: {:?}", ctx.accounts.out.key());
-    let message = [&ctx.accounts.out.key().to_bytes()[..], &sn[..], &deal.to_bytes()[..], &expired_at.to_le_bytes()].concat();
+    let message = [&ctx.accounts.out.key().to_bytes()[..], &ctx.accounts.fee_user.key().to_bytes()[..], &sn[..], &deal.to_bytes()[..], &expired_at.to_le_bytes()].concat();
     verify_ed25519_instruction(
         &ctx.accounts.instruction_sysvar,
         ctx.accounts.payment_state.signer.as_ref(),
         &message,
         &signature,
     )?;
+
+    if ctx.accounts.mint.key() == anchor_spl::token::spl_token::native_mint::id() {
+        require!(ctx.accounts.fee_user.key() == ctx.accounts.payment_state.fee_to, ErrorCode::InvalidFeeUser);
+    } else {
+        let fee_user_owner = get_ata_owner_from_unchecked_account(&ctx.accounts.fee_user)?;
+        require!(fee_user_owner == ctx.accounts.payment_state.fee_to, ErrorCode::InvalidFeeUser); 
+    }
 
     // Mark the record as executed
     ctx.accounts.record.executed = true;
@@ -143,7 +150,7 @@ pub fn handler(
     }
 
     // Emit transfer event
-    emit!(SettlementEvent {
+    emit!(SettleEvent {
         sn,
         token: ctx.accounts.mint.key(),
         from: deal.from,

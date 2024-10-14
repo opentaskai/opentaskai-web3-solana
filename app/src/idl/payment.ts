@@ -1653,16 +1653,16 @@ export type Payment = {
       ]
     },
     {
-      "name": "settlementEvent",
+      "name": "settleEvent",
       "discriminator": [
-        48,
-        132,
-        218,
-        111,
-        54,
-        173,
-        61,
-        129
+        14,
+        166,
+        206,
+        248,
+        35,
+        1,
+        134,
+        48
       ]
     },
     {
@@ -1800,6 +1800,16 @@ export type Payment = {
       "code": 6018,
       "name": "invalidMessage",
       "msg": "Invalid message"
+    },
+    {
+      "code": 6019,
+      "name": "invalidFeeUser",
+      "msg": "Invalid fee user"
+    },
+    {
+      "code": 6020,
+      "name": "invalidAtaOwner",
+      "msg": "Invalid ATA owner"
     }
   ],
   "types": [
@@ -1925,57 +1935,7 @@ export type Payment = {
       }
     },
     {
-      "name": "settlementData",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "from",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "to",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "available",
-            "type": "u64"
-          },
-          {
-            "name": "frozen",
-            "type": "u64"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "fee",
-            "type": "u64"
-          },
-          {
-            "name": "paid",
-            "type": "u64"
-          },
-          {
-            "name": "excessFee",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "settlementEvent",
+      "name": "settleEvent",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2045,6 +2005,56 @@ export type Payment = {
           {
             "name": "user",
             "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "settlementData",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "from",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "to",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "available",
+            "type": "u64"
+          },
+          {
+            "name": "frozen",
+            "type": "u64"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "fee",
+            "type": "u64"
+          },
+          {
+            "name": "paid",
+            "type": "u64"
+          },
+          {
+            "name": "excessFee",
+            "type": "u64"
           }
         ]
       }

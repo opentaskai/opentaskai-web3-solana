@@ -374,7 +374,7 @@ pub struct Transfer<'info> {
     #[account(mut)]
     pub out: UncheckedAccount<'info>,
     /// CHECK: This account is checked in the instruction
-    #[account(mut, constraint = fee_user.key() == payment_state.fee_to)]
+    #[account(mut)]
     pub fee_user: UncheckedAccount<'info>,
     /// CHECK: This account is checked in the instruction
     #[account(
@@ -434,7 +434,7 @@ pub struct Settlement<'info> {
     #[account(mut)]
     pub out: UncheckedAccount<'info>,
     /// CHECK: This account is checked in the instruction
-    #[account(mut, constraint = fee_user.key() == payment_state.fee_to)]
+    #[account(mut)]
     pub fee_user: UncheckedAccount<'info>,
     /// CHECK: This account is checked in the instruction
     #[account(

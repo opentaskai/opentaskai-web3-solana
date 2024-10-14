@@ -55,7 +55,7 @@ pub struct TransferEvent {
 }
 
 #[event]
-pub struct SettlementEvent {
+pub struct SettleEvent {
     pub sn: [u8; 32],
     pub token: Pubkey,
     pub from: [u8; 32],

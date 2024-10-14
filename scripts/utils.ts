@@ -62,13 +62,19 @@ export function getDataFromTransaction(tx: any, programId: string, instruction: 
 
   if(tx && tx.meta && tx.meta.logMessages) {
     const findProgram = tx.meta.logMessages[tx.meta.logMessages.length-1] === `Program ${programId} success`;
-    const findInstruction = tx.meta.logMessages.find(log => log === 'Program log: Instruction: '+ instruction);
-    if(findProgram && findInstruction) {
-      const programDataLog = tx.meta.logMessages.find(log => log.startsWith("Program data:"));
-      return programDataLog.split("Program data: ")[1];
+    if(!findProgram) {
+      throw new Error('not found programId:' + programId);
     }
+    
+    const findInstruction = tx.meta.logMessages.find(log => log === 'Program log: Instruction: '+ instruction);
+    if(!findInstruction) {
+      throw new Error('not found instruction:' + instruction);
+    }
+
+    const programDataLog = tx.meta.logMessages.find(log => log.startsWith("Program data:"));
+    return programDataLog.split("Program data: ")[1];
   }
-  throw new Error('not found program data');
+  throw new Error('invalid transaction');
 }
 
 export function parseEventFromTransaction(tx: any, programId: string, instruction: string) {
@@ -125,7 +131,7 @@ export function parseEventFromTransaction(tx: any, programId: string, instructio
       fee: dataBuffer.readBigUInt64LE(208), // Next 8 bytes for fee
       user: new PublicKey(dataBuffer.slice(216, 248)), // Next 32 bytes for user
     };
-  } else if (instruction === 'Settlement') {
+  } else if (instruction === 'Settle') {
     return {
       sn: dataBuffer.slice(8, 40), // First 32 bytes for sn
       token: new PublicKey(dataBuffer.slice(40, 72)), // Next 32 bytes for token

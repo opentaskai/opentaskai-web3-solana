@@ -40,4 +40,8 @@ pub enum ErrorCode {
     InvalidPublicKey,
     #[msg("Invalid message")]
     InvalidMessage,
+    #[msg("Invalid fee user")]
+    InvalidFeeUser,
+    #[msg("Invalid ATA owner")]
+    InvalidATAOwner,
 }

@@ -119,6 +119,9 @@ describe("payment", () => {
       )
       .then((account) => account.address);
 
+    console.log('user1ATA:', user1ATA);
+    console.log('user2ATA:', user2ATA);
+    console.log('feeATA:', feeATA);
 
     const userTokenBalance = await getTokenAccountBalance(provider.connection, mint, payerKeypair.publicKey);
     console.log("User token balance:", userTokenBalance);
@@ -299,7 +302,6 @@ describe("payment", () => {
     );
     assert(programSolPDA.equals(expectedProgramSolAccount), "SOL Program token address is not correctly derived");
   });
-
 
   it("Change fee to", async () => {
     try {
@@ -994,44 +996,6 @@ describe("payment", () => {
     }
   });
 
-  it("Settle for SOL", async () => {
-    const amount = new anchor.BN(LAMPORTS_PER_SOL / 10); // 0.1 SOL
-    const fee = amount.div(new anchor.BN(10)); // 0.01 SOL
-    const from = String(SOL_DEPOSIT_ACCOUNT_FILL);
-    // Record balances before freeze
-    const programBalanceBefore = await provider.connection.getBalance(programSolPDA);
-    console.log("Program SOL Balance before freeze:", programBalanceBefore / LAMPORTS_PER_SOL);
-    let sn = uuid();
-    let to = Buffer.alloc(32).fill(5).toString('hex');
-    let deal = new SettlementData(
-      bytes32Buffer(from), 
-      bytes32Buffer(to), 
-      new anchor.BN(0), 
-      new anchor.BN(amount.add(fee)), 
-      amount, 
-      fee, 
-      new anchor.BN(amount.add(fee)), 
-      new anchor.BN(0)
-    ); 
-    try {
-      await settle(
-        provider,
-        program,
-        payerKeypair,
-        payerKeypair,
-        spl.NATIVE_MINT,
-        user2Keypair.publicKey,
-        payerKeypair.publicKey,
-        sn,
-        deal,
-        expiredAt,
-      );
-    } catch(e:any) {
-        assert.fail("Expected an error but the transaction failed");
-    }
-  });
-  */
-
   it("Transfer for SOL", async () => {
     const amount = new anchor.BN(LAMPORTS_PER_SOL / 10); // 0.1 SOL
     const fee = amount.div(new anchor.BN(10)); // 0.01 SOL
@@ -1065,6 +1029,20 @@ describe("payment", () => {
     const from = String(TOKEN_DEPOSIT_ACCOUNT_FILL);
     const sn = uuid();
     const to = String(USER2_TOKEN_ACCOUNT_FILL);
+
+        // Retrieve the account info for the associated token account
+    const feeATAInfo = await provider.connection.getAccountInfo(feeATA);
+
+    if (feeATAInfo) {
+      // Decode the account data using SPL Token's getAccount function
+      const feeATAAccount = await spl.getAccount(provider.connection, feeATA);
+      
+      // Access the owner field
+      console.log('Owner of feeATA:', feeATAAccount);
+      console.log('feeTo pubkey:', feeToKeypair.publicKey.toBase58());
+    } else {
+      console.log('Account not found');
+    }
     try {
       await transfer(
         provider,
@@ -1083,6 +1061,75 @@ describe("payment", () => {
       );
     } catch(e:any) {
         assert.fail("Expected an error but the transaction failed:", e);
+    }
+  });
+
+*/
+  it("Settle for SOL", async () => {
+    const amount = new anchor.BN(LAMPORTS_PER_SOL / 100); // 0.1 SOL
+    const fee = amount.div(new anchor.BN(10)); // 0.01 SOL
+    const from = String(SOL_DEPOSIT_ACCOUNT_FILL);
+    const sn = uuid();
+    const to = String(USER2_SOL_ACCOUNT_FILL);
+    let deal = new SettlementData(
+      bytes32Buffer(from), 
+      bytes32Buffer(to), 
+      new anchor.BN(0), 
+      new anchor.BN(amount.add(fee)), 
+      amount, 
+      fee, 
+      new anchor.BN(amount.add(fee)), 
+      new anchor.BN(0)
+    ); 
+    try {
+      await settle(
+        provider,
+        program,
+        payerKeypair,
+        payerKeypair,
+        spl.NATIVE_MINT,
+        user2Keypair.publicKey,
+        feeToKeypair.publicKey,
+        sn,
+        deal,
+        expiredAt,
+      );
+    } catch(e:any) {
+        assert.fail("Expected an error but the transaction failed", e);
+    }
+  });
+
+  it("Settle for Token", async () => {
+    const amount = new anchor.BN(LAMPORTS_PER_SOL / 100); // 0.1 SOL
+    const fee = amount.div(new anchor.BN(10)); // 0.01 SOL
+    const from = String(TOKEN_DEPOSIT_ACCOUNT_FILL);
+    const sn = uuid();
+    const to = String(USER2_TOKEN_ACCOUNT_FILL);
+    let deal = new SettlementData(
+      bytes32Buffer(from), 
+      bytes32Buffer(to), 
+      new anchor.BN(0), 
+      new anchor.BN(amount.add(fee)), 
+      amount, 
+      fee, 
+      new anchor.BN(amount.add(fee)), 
+      new anchor.BN(0)
+    ); 
+    try {
+      await settle(
+        provider,
+        program,
+        payerKeypair,
+        payerKeypair,
+        mint,
+        user2ATA,
+        feeATA,
+        sn,
+        deal,
+        expiredAt,
+      );
+    } catch(e:any) {
+        assert.fail("Expected an error but the transaction failed", e);
     }
   });
 });

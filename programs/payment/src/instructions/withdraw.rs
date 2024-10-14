@@ -19,7 +19,7 @@ pub fn handler(
     let clock = Clock::get()?;
     require!(clock.unix_timestamp < expired_at, ErrorCode::Expired);
 
-    let message = [&sn[..], &from[..], &available.to_le_bytes(), &frozen.to_le_bytes(), &expired_at.to_le_bytes()].concat();
+    let message = [&ctx.accounts.to.key().to_bytes()[..], &sn[..], &from[..], &available.to_le_bytes(), &frozen.to_le_bytes(), &expired_at.to_le_bytes()].concat();
     verify_ed25519_instruction(
         &ctx.accounts.instruction_sysvar,
         ctx.accounts.payment_state.signer.as_ref(),

@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use crate::utils::{verify_ed25519_instruction, transfer_sol, transfer_token};
+use crate::utils::{verify_ed25519_instruction, transfer_sol, transfer_token, get_ata_owner_from_unchecked_account};
 use crate::errors::ErrorCode;
 use crate::events::TransferEvent;
 use crate::Transfer;
@@ -22,13 +22,23 @@ pub fn handler(
 
     require!(amount > 0 && amount > fee, ErrorCode::InvalidParameter);
 
-    let message = [&sn[..], &from[..], &to[..], &amount.to_le_bytes(), &fee.to_le_bytes(), &expired_at.to_le_bytes()].concat();
+    let message = [&ctx.accounts.out.key().to_bytes()[..], &ctx.accounts.fee_user.key().to_bytes()[..], &sn[..], &from[..], &to[..], &amount.to_le_bytes(), &fee.to_le_bytes(), &expired_at.to_le_bytes()].concat();
     verify_ed25519_instruction(
         &ctx.accounts.instruction_sysvar,
         ctx.accounts.payment_state.signer.as_ref(),
         &message,
         &signature,
     )?;
+
+    // msg!("payment_state.fee_to: {}", ctx.accounts.payment_state.fee_to.to_string());
+    if ctx.accounts.mint.key() == anchor_spl::token::spl_token::native_mint::id() {
+        // msg!("fee_user wallet: {}", ctx.accounts.fee_user.key().to_string());
+        require!(ctx.accounts.fee_user.key() == ctx.accounts.payment_state.fee_to, ErrorCode::InvalidFeeUser);
+    } else {
+        let fee_user_owner = get_ata_owner_from_unchecked_account(&ctx.accounts.fee_user)?;
+        // msg!("fee_user_owner: {:?}", fee_user_owner);
+        require!(fee_user_owner == ctx.accounts.payment_state.fee_to, ErrorCode::InvalidFeeUser); // Added usage of fee_user_token_account
+    }
 
     // Mark the record as executed
     ctx.accounts.record.executed = true;
