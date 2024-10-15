@@ -22,7 +22,13 @@ pub fn handler(
 
     require!(amount > 0 && amount > fee, ErrorCode::InvalidParameter);
 
-    let message = [&ctx.accounts.out.key().to_bytes()[..], &ctx.accounts.fee_user.key().to_bytes()[..], &sn[..], &from[..], &to[..], &amount.to_le_bytes(), &fee.to_le_bytes(), &expired_at.to_le_bytes()].concat();
+    let message = [
+        &sn[..], &from[..], &to[..], &amount.to_le_bytes(), &fee.to_le_bytes(), &expired_at.to_le_bytes(),
+        &ctx.accounts.user.key().to_bytes()[..],
+        &ctx.accounts.mint.key().to_bytes()[..],
+        &ctx.accounts.out.key().to_bytes()[..], 
+        &ctx.accounts.fee_user.key().to_bytes()[..], 
+    ].concat();
     verify_ed25519_instruction(
         &ctx.accounts.instruction_sysvar,
         ctx.accounts.payment_state.signer.as_ref(),

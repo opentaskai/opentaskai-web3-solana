@@ -13,31 +13,6 @@ pub fn handler(
     expired_at: i64,
     signature: [u8; 64],
 ) -> Result<()> {
-    msg!("Checking account states...");
-    // msg!("User balance: {:?}", ctx.accounts.user.lamports());
-    msg!("Mint: {:?}", ctx.accounts.mint.key());
-    msg!("From account: {:?}", ctx.accounts.from_token_account.key());
-    msg!("Fee User account: {:?}", ctx.accounts.fee_user.key());
-    msg!("Out account: {:?}", ctx.accounts.out.key());
-    msg!("Deal: {:?}", deal);
-
-    msg!("From account before access: {:?}", ctx.accounts.from_token_account);
-
-    // Generate the PDAs
-    let from_token_account_pda = Pubkey::find_program_address(
-        &[b"user-token", deal.from.as_ref(), ctx.accounts.mint.key().as_ref()],
-        ctx.program_id,
-    );
-    let to_token_account_pda = Pubkey::find_program_address(
-        &[b"user-token", deal.to.as_ref(), ctx.accounts.mint.key().as_ref()],
-        ctx.program_id,
-    );
-
-    msg!("Derived From Token Account PDA: {:?}", from_token_account_pda);
-    msg!("Derived To Token Account PDA: {:?}", to_token_account_pda);
-
-    msg!("To account: {:?}", ctx.accounts.to_token_account.key());
-
     // Check if the record already exists
     require!(ctx.accounts.record.executed == false, ErrorCode::AlreadyExecuted);
     // Check if the request is expired
@@ -51,8 +26,14 @@ pub fn handler(
         deal.frozen >= deal.excess_fee, ErrorCode::InvalidParameter
     );
 
-    msg!("out pubkey: {:?}", ctx.accounts.out.key());
-    let message = [&ctx.accounts.out.key().to_bytes()[..], &ctx.accounts.fee_user.key().to_bytes()[..], &sn[..], &deal.to_bytes()[..], &expired_at.to_le_bytes()].concat();
+    let message = [
+        &sn[..], &deal.to_bytes()[..], &expired_at.to_le_bytes(),
+        &ctx.accounts.user.key().to_bytes()[..], 
+        &ctx.accounts.mint.key().to_bytes()[..],
+        &ctx.accounts.out.key().to_bytes()[..], 
+        &ctx.accounts.fee_user.key().to_bytes()[..],
+    ].concat();
+
     verify_ed25519_instruction(
         &ctx.accounts.instruction_sysvar,
         ctx.accounts.payment_state.signer.as_ref(),

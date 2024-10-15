@@ -3,10 +3,16 @@ use crate::errors::ErrorCode;
 use anchor_lang::system_program::System;
 use anchor_spl::token::{self, Token};
 use crate::state::{PaymentState};
+use sha2::{Sha256, Digest};
 // use solana_program::ed25519_program;
 // use solana_program::instruction::Instruction;
 use solana_program::sysvar::instructions::{load_instruction_at_checked, load_current_index_checked};
 
+fn hash_sha256(data: &[u8]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    hasher.finalize().into()
+}
 
 #[cfg(feature = "test")]
 pub fn verify_ed25519_instruction(
@@ -55,9 +61,10 @@ pub fn verify_ed25519_instruction(
     }
 
     // Verify message
+    let message_hash = hash_sha256(message);
     let msg_start = offsets.message_data_offset as usize;
     let msg_end = msg_start + offsets.message_data_size as usize;
-    if &instruction_data[msg_start..msg_end] != message {
+    if &instruction_data[msg_start..msg_end] != message_hash {
         return Err(ErrorCode::InvalidMessage.into());
     }
 

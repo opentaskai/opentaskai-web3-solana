@@ -18,7 +18,11 @@ pub fn handler(
     let clock = Clock::get()?;
     require!(clock.unix_timestamp < expired_at, ErrorCode::Expired);
 
-    let message = [ &sn[..], &account[..], &amount.to_le_bytes(), &expired_at.to_le_bytes()].concat();
+    let message = [ 
+        &sn[..], &account[..], &amount.to_le_bytes(), &expired_at.to_le_bytes(),
+        &ctx.accounts.user.key().to_bytes()[..],
+        &ctx.accounts.mint.key().to_bytes()[..],
+    ].concat();
     verify_ed25519_instruction(
         &ctx.accounts.instruction_sysvar,
         ctx.accounts.payment_state.signer.as_ref(),

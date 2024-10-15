@@ -16,6 +16,7 @@ import { keccak256 } from 'js-sha3';
 import { getTokenAccountBalance, getPDABalance } from "../scripts/tokens";
 import { parseEventFromTransaction, bytesBuffer, bytes32Buffer } from "../scripts/utils";
 import assert from "assert";
+import { createHash } from 'crypto';
 
 export const FEE_ACCOUNT_FILL = Buffer.alloc(32).fill(1).toString('hex');
 export const ZERO_ACCOUNT = new PublicKey(new Uint8Array(32).fill(0));
@@ -78,9 +79,21 @@ export async function showUserTokenAccount(
   console.log(mark, result);
 }
 
+export function getEd25519Instruction(message: Buffer, signerKeypair: Keypair) {
+  const messageHash = createHash('sha256').update(message).digest();
+  // console.log("Message hash:", messageHash.toString('hex'));
+  const signature = signMessageForEd25519(messageHash, signerKeypair);
+  const ed25519Instruction = Ed25519Program.createInstructionWithPublicKey({
+    publicKey: signerKeypair.publicKey.toBytes(),
+    message: messageHash,
+    signature: signature,
+  });
+  return {ed25519Instruction, signature};
+}
+
 export function signMessageForEd25519(message: Buffer, signerKeypair: Keypair) {
   const signature = nacl.sign.detached(message, signerKeypair.secretKey);
-  // console.log("Signature:", signature);
+  console.log("Signature:", signature);
   return signature;
 }
 
@@ -205,20 +218,17 @@ export async function depositWithMessage(
       accountBuffer,
       amount.toArrayLike(Buffer, 'le', 8),
       frozen.toArrayLike(Buffer, 'le', 8),
-      expiredAt.toArrayLike(Buffer, 'le', 8)
+      expiredAt.toArrayLike(Buffer, 'le', 8),
+      payerKeypair.publicKey.toBuffer(),
+      mint.toBuffer(),
+      tokenAccount.toBuffer(),  
     ]);
   }
   console.log("SN before signing:", snBuffer.toString('hex')); // Log before signing
-  const signature = signMessageForEd25519(message, signerKeypair);
+  const {ed25519Instruction, signature} = getEd25519Instruction(message, signerKeypair);
   console.log("Message for signing:", message.toString('hex'));
 
   try {
-    const ed25519Instruction = Ed25519Program.createInstructionWithPublicKey({
-      publicKey: signerKeypair.publicKey.toBytes(),
-      message: message,
-      signature: signature,
-    });
-    
     // console.log('input parameters: ',  {user: payerKeypair.publicKey.toBase58(), token: mint, account:accountBuffer, amount: amount.toString(), frozen: frozen.toString(), sn: snBuffer, expiredAt, signature});
     const tx = await program.methods
     .deposit(snBuffer, accountBuffer, amount, frozen, expiredAt, signature)
@@ -355,22 +365,18 @@ export async function withdraw(
 
   // Create and sign the message
   const message = Buffer.concat([
-    to.toBuffer(),
     snBuffer,
     accountBuffer,
     available.toArrayLike(Buffer, 'le', 8),
     frozen.toArrayLike(Buffer, 'le', 8),
-    expiredAt.toArrayLike(Buffer, 'le', 8)
+    expiredAt.toArrayLike(Buffer, 'le', 8),
+    payerKeypair.publicKey.toBuffer(),
+    mint.toBuffer(),
+    to.toBuffer(),
   ]);
 
   try {
-    const signature = signMessageForEd25519(message, signerKeypair);
-    const ed25519Instruction = Ed25519Program.createInstructionWithPublicKey({
-      publicKey: signerKeypair.publicKey.toBytes(),
-      message: message,
-      signature: signature,
-    });
-
+    const {ed25519Instruction, signature} = getEd25519Instruction(message, signerKeypair);
     // console.log('input parameters: ',  {user: payerKeypair.publicKey.toBase58(), token: mint, account:accountBuffer, available: available.toString(), frozen: frozen.toString(), sn: snBuffer, expiredAt, signature});
     const tx = await program.methods
       .withdraw(snBuffer, accountBuffer, available, frozen, expiredAt, signature)
@@ -473,17 +479,13 @@ export async function freeze(
     snBuffer,
     accountBuffer,
     amount.toArrayLike(Buffer, 'le', 8),
-    expiredAt.toArrayLike(Buffer, 'le', 8)
+    expiredAt.toArrayLike(Buffer, 'le', 8),
+    payerKeypair.publicKey.toBuffer(),
+    mint.toBuffer(),
   ]);
 
   try {
-    const signature = signMessageForEd25519(message, signerKeypair);
-    const ed25519Instruction = Ed25519Program.createInstructionWithPublicKey({
-      publicKey: signerKeypair.publicKey.toBytes(),
-      message: message,
-      signature: signature,
-    });
-
+    const {ed25519Instruction, signature} = getEd25519Instruction(message, signerKeypair);
     const tx = await program.methods
       .freeze(snBuffer, accountBuffer, amount, expiredAt, signature)
       .accounts({
@@ -601,17 +603,13 @@ export async function unfreezeWithAccount(
     accountBuffer,
     amount.toArrayLike(Buffer, 'le', 8),
     fee.toArrayLike(Buffer, 'le', 8),
-    expiredAt.toArrayLike(Buffer, 'le', 8)
+    expiredAt.toArrayLike(Buffer, 'le', 8),
+    payerKeypair.publicKey.toBuffer(),
+    mint.toBuffer(),
   ]);
 
   try {
-    const signature = signMessageForEd25519(message, signerKeypair);
-    const ed25519Instruction = Ed25519Program.createInstructionWithPublicKey({
-      publicKey: signerKeypair.publicKey.toBytes(),
-      message: message,
-      signature: signature,
-    });
-
+    const {ed25519Instruction, signature} = getEd25519Instruction(message, signerKeypair);
     const tx = await program.methods
       .unfreeze(snBuffer, accountBuffer, amount, fee, expiredAt, signature)
       .accounts({
@@ -817,25 +815,20 @@ export async function transferWitchAccount(
 
   // Create and sign the message
   const message = Buffer.concat([
-    out.toBuffer(),
-    feeUser.toBuffer(),
     snBuffer,
     fromBuffer,
     toBuffer,
     amount.toArrayLike(Buffer, 'le', 8),
     fee.toArrayLike(Buffer, 'le', 8),
-    expiredAt.toArrayLike(Buffer, 'le', 8)
+    expiredAt.toArrayLike(Buffer, 'le', 8), 
+    payerKeypair.publicKey.toBuffer(),
+    mint.toBuffer(),
+    out.toBuffer(),
+    feeUser.toBuffer(),
   ]);
 
   try {
-    const signature = signMessageForEd25519(message, signerKeypair);
-    const ed25519Instruction = Ed25519Program.createInstructionWithPublicKey({
-      publicKey: signerKeypair.publicKey.toBytes(),
-      message: message,
-      signature: signature,
-    });
-
-    console.log("Message:", message.toString('hex'));
+    const {ed25519Instruction, signature} = getEd25519Instruction(message, signerKeypair);
     // console.log('input parameters: ',  {user: payerKeypair.publicKey.toBase58(), token: mint.toBase58(), sn: snBuffer, from:fromBuffer, to: toBuffer, amount: amount.toString(), fee: fee.toString(), expiredAt, signature});
     const tx = await program.methods
       .transfer(snBuffer, fromBuffer, toBuffer, amount, fee, expiredAt, signature)
@@ -1096,28 +1089,20 @@ export async function settleWithAccount(
   } catch (error) {
     console.error("to Token Account Info Error details:", error);
   }
-  
 
   // Create and sign the message
   const message = Buffer.concat([
-    out.toBuffer(),
-    feeUser.toBuffer(),
     snBuffer,
     deal.toBytes(),
-    expiredAt.toArrayLike(Buffer, 'le', 8)
+    expiredAt.toArrayLike(Buffer, 'le', 8),
+    payerKeypair.publicKey.toBuffer(),
+    mint.toBuffer(),
+    out.toBuffer(),
+    feeUser.toBuffer(),
   ]);
 
-
   try {
-    const signature = signMessageForEd25519(message, signerKeypair);
-    const ed25519Instruction = Ed25519Program.createInstructionWithPublicKey({
-      publicKey: signerKeypair.publicKey.toBytes(),
-      message: message,
-      signature: signature,
-    });
-
-    console.log("Message:", message.toString('hex'));
-
+    const {ed25519Instruction, signature} = getEd25519Instruction(message, signerKeypair);
     const tx = await program.methods
       .settle(snBuffer, deal, expiredAt, signature)
       .accounts({

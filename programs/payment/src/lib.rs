@@ -183,13 +183,13 @@ pub struct Deposit<'info> {
     /// CHECK: This is the token account that we want to transfer to
     #[account(mut)]
     pub user_token: UncheckedAccount<'info>,
+    /// CHECK: This account is checked in the instruction
     #[account(
         mut,
         seeds = [b"program-token", mint.key().as_ref()],
         bump,
         owner = if *mint.key == anchor_spl::token::spl_token::native_mint::id() { system_program.key() } else { token_program.key() }
     )]
-    /// CHECK: This account is checked in the instruction
     pub program_token: UncheckedAccount<'info>,
     #[account(
         init_if_needed,

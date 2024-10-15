@@ -328,6 +328,8 @@ describe("payment", () => {
     const sn = uuid(); // Use a random SN for each test
     const sn2 = uuid();
 
+    const tokenAccount = payerKeypair.publicKey;
+
     //test InvalidMessage
     // Create and sign the message
     let message = Buffer.concat([
@@ -364,7 +366,10 @@ describe("payment", () => {
       bytes32Buffer(account),
       amount.toArrayLike(Buffer, 'le', 8),
       frozen.toArrayLike(Buffer, 'le', 8),
-      expiredAt.toArrayLike(Buffer, 'le', 8)
+      expiredAt.toArrayLike(Buffer, 'le', 8),
+      payerKeypair.publicKey.toBuffer(),
+      spl.NATIVE_MINT.toBuffer(),
+      tokenAccount.toBuffer(),
     ]);
     const signerKeypair = Keypair.generate();
     try {
@@ -504,7 +509,7 @@ describe("payment", () => {
       "Program token balance is incorrect"
     );
   });
-/*
+
   it("Deposits and then withdraws SOL", async () => {
     // Deposit SOL first
     const depositAmount = new anchor.BN(1 * LAMPORTS_PER_SOL); // 2 SOL
@@ -1064,7 +1069,7 @@ describe("payment", () => {
     }
   });
 
-*/
+
   it("Settle for SOL", async () => {
     const amount = new anchor.BN(LAMPORTS_PER_SOL / 100); // 0.1 SOL
     const fee = amount.div(new anchor.BN(10)); // 0.01 SOL
@@ -1132,4 +1137,5 @@ describe("payment", () => {
         assert.fail("Expected an error but the transaction failed", e);
     }
   });
+  
 });
