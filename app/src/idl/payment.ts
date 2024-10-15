@@ -370,36 +370,6 @@ export type Payment = {
           "name": "mint"
         },
         {
-          "name": "programToken",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  114,
-                  111,
-                  103,
-                  114,
-                  97,
-                  109,
-                  45,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "mint"
-              }
-            ]
-          }
-        },
-        {
           "name": "record",
           "writable": true,
           "pda": {
@@ -423,16 +393,8 @@ export type Payment = {
           }
         },
         {
-          "name": "tokenProgram",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-        },
-        {
           "name": "systemProgram",
           "address": "11111111111111111111111111111111"
-        },
-        {
-          "name": "associatedTokenProgram",
-          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
           "name": "instructionSysvar"
@@ -1272,36 +1234,6 @@ export type Payment = {
           "name": "mint"
         },
         {
-          "name": "programToken",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  114,
-                  111,
-                  103,
-                  114,
-                  97,
-                  109,
-                  45,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "mint"
-              }
-            ]
-          }
-        },
-        {
           "name": "record",
           "writable": true,
           "pda": {
@@ -1325,16 +1257,8 @@ export type Payment = {
           }
         },
         {
-          "name": "tokenProgram",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-        },
-        {
           "name": "systemProgram",
           "address": "11111111111111111111111111111111"
-        },
-        {
-          "name": "associatedTokenProgram",
-          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
           "name": "instructionSysvar"

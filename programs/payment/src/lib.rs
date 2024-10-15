@@ -269,15 +269,6 @@ pub struct Freeze<'info> {
     pub user: Signer<'info>,
     /// CHECK: This account is checked in the instruction handler
     pub mint: UncheckedAccount<'info>,
-    /// CHECK: This is the token account that we want to transfer to
-    #[account(
-        mut,
-        seeds = [b"program-token", mint.key().as_ref()],
-        bump,
-        owner = if *mint.key == anchor_spl::token::spl_token::native_mint::id() { system_program.key() } else { token_program.key() }
-    )]
-    /// CHECK: This account is checked in the instruction
-    pub program_token: UncheckedAccount<'info>,
     #[account(
         init_if_needed,
         payer = user,
@@ -286,9 +277,7 @@ pub struct Freeze<'info> {
         bump
     )]
     pub record: Account<'info, TransactionRecord>,
-    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
-    pub associated_token_program: Program<'info, AssociatedToken>,
     /// CHECK: This account is used to verify the Ed25519 instruction
     pub instruction_sysvar: AccountInfo<'info>,
     pub rent: Sysvar<'info, Rent>,
@@ -318,14 +307,6 @@ pub struct Unfreeze<'info> {
     /// CHECK: This account is checked in the instruction handler
     pub mint: UncheckedAccount<'info>,
     #[account(
-        mut,
-        seeds = [b"program-token", mint.key().as_ref()],
-        bump,
-        owner = if *mint.key == anchor_spl::token::spl_token::native_mint::id() { system_program.key() } else { token_program.key() }
-    )]
-    /// CHECK: This account is checked in the instruction
-    pub program_token: UncheckedAccount<'info>,
-    #[account(
         init_if_needed,
         payer = user,
         space = 8 + TransactionRecord::LEN,
@@ -333,9 +314,7 @@ pub struct Unfreeze<'info> {
         bump
     )]
     pub record: Account<'info, TransactionRecord>,
-    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
-    pub associated_token_program: Program<'info, AssociatedToken>,
     /// CHECK: This account is used to verify the Ed25519 instruction
     pub instruction_sysvar: AccountInfo<'info>,
     pub rent: Sysvar<'info, Rent>,

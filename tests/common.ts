@@ -457,12 +457,6 @@ export async function freeze(
     program.programId
   );
 
-  // Derive the program token account PDA
-  const [programTokenPDA] = PublicKey.findProgramAddressSync(
-    [Buffer.from("program-token"), mint.toBuffer()],
-    program.programId
-  );
-
   // Derive the record account PDA
   const [recordPubkey] = PublicKey.findProgramAddressSync(
     [Buffer.from("record"), snBuffer],
@@ -493,11 +487,8 @@ export async function freeze(
         userTokenAccount: userAccountPDA,
         user: payerKeypair.publicKey,
         mint: mint,
-        programToken: programTokenPDA,
         record: recordPubkey,
-        tokenProgram: spl.TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
-        associatedTokenProgram: spl.ASSOCIATED_TOKEN_PROGRAM_ID,
         instructionSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
       })
@@ -585,12 +576,6 @@ export async function unfreezeWithAccount(
     );
   }
 
-  // Derive the program token account PDA
-  const [programTokenPDA] = PublicKey.findProgramAddressSync(
-    [Buffer.from("program-token"), mint.toBuffer()],
-    program.programId
-  );
-
   // Derive the record account PDA
   const [recordPubkey] = PublicKey.findProgramAddressSync(
     [Buffer.from("record"), snBuffer],
@@ -618,11 +603,8 @@ export async function unfreezeWithAccount(
         feeTokenAccount: feeAccountPDA,
         user: payerKeypair.publicKey,
         mint: mint,
-        programToken: programTokenPDA,
         record: recordPubkey,
-        tokenProgram: spl.TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
-        associatedTokenProgram: spl.ASSOCIATED_TOKEN_PROGRAM_ID,
         instructionSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
       })
