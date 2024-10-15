@@ -1265,25 +1265,26 @@ export async function settle(
   const feeUserBalanceAfter = await getPDABalance(provider.connection, mint, feeUser);
   console.log("feeUserBalanceAfter after:", feeUserBalanceAfter);
 
-  assert.strictEqual(fromTokenAccountInfoAfter.available.toString(), fromTokenAccountInfoBefore.available.sub(deal.available).toString(), "from token account available doesn't match");
-  assert.strictEqual(fromTokenAccountInfoAfter.frozen.toString(), fromTokenAccountInfoBefore.frozen.sub(deal.frozen).toString(), "from token account froze doesn't match");
+  let excessAmount = deal.paid.sub(deal.frozen);
+  assert.strictEqual(fromTokenAccountInfoAfter.available.toString(), fromTokenAccountInfoBefore.available.sub(deal.available).add(excessAmount).sub(deal.excessFee).toString(), "from token account available doesn't match");
+  assert.strictEqual(fromTokenAccountInfoAfter.frozen.toString(), fromTokenAccountInfoBefore.frozen.sub(deal.frozen).sub(excessAmount).toString(), "from token account froze doesn't match");
+  
   // if transfer to zero account, only inner transfer, else transfer to out account and fee account
   if(out.toBase58() === ZERO_ACCOUNT.toBase58()) {
     assert.strictEqual(toTokenAccountInfoAfter.available.toString(), toTokenAccountInfoBefore.available.add(deal.amount).toString(), "to token account available doesn't match");
     assert.strictEqual(feeTokenAccountInfoAfter.available.toString(), feeTokenAccountInfoBefore.available.add(deal.fee).toString(), "fee token account available doesn't match");
   } else {
     if(mint.toBase58() === spl.NATIVE_MINT.toBase58()) {
-      assert.strictEqual(fromTokenAccountInfoAfter.available.lte(fromTokenAccountInfoBefore.available), true, "from token account available doesn't match");
       assert.strictEqual(toTokenAccountInfoAfter.available.toString(), toTokenAccountInfoBefore.available.toString(), "to token account available doesn't match");
       assert.strictEqual(feeTokenAccountInfoAfter.available.toString(), feeTokenAccountInfoBefore.available.toString(), "fee token account available doesn't match");
     } else {
       assert.strictEqual(fromBalanceAfter.toString(), fromBalanceBefore.toString(), "from token account balance doesn't match");
     }
     
-    
-    // assert.strictEqual(programTokenBlanaceAfter, BigInt(programTokenBlanceBefore) - BigInt(amount.toString()), "program token account balance doesn't match");
-    // assert.strictEqual(outBalanceAfter.toString(), amount.sub(fee).add(new anchor.BN(outBalanceBefore.toString())).toString(), "out token account balance doesn't match");
-    // assert.strictEqual(feeUserBalanceAfter.toString(), fee.add(new anchor.BN(feeUserBalanceBefore.toString())).toString(), "fee token account balance doesn't match");
+    let outAmount = deal.amount.add(deal.fee).add(deal.excessFee);
+    assert.strictEqual(programTokenBlanaceAfter, BigInt(programTokenBlanceBefore) - BigInt(outAmount.toString()), "program token account balance doesn't match");
+    assert.strictEqual(outBalanceAfter.toString(), deal.amount.add(new anchor.BN(outBalanceBefore.toString())).toString(), "out token account balance doesn't match");
+    assert.strictEqual(feeUserBalanceAfter.toString(), deal.fee.add(deal.excessFee).add(new anchor.BN(feeUserBalanceBefore.toString())).toString(), "fee token account balance doesn't match");
   }
     
   // Fetch the transaction details to get the events
