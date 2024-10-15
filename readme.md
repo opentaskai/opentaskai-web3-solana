@@ -16,8 +16,8 @@ $ pnpm cli scripts/accounts.ts target/deploy/payment-keypair.json
 replace payment public key:
 /Anchor.toml
 [programs.localnet]
-payment = "7mEtBse9oundTRfuYNTmPBaYr1gGNM5sewKDo23meJXe"
+payment = "2Fa5PQ8sMNN95P6n7hxWaeyvM2FTjPJsFXh17MQUw6V9"
 
 promgrams/src/lib.rs
-declare_id!("7mEtBse9oundTRfuYNTmPBaYr1gGNM5sewKDo23meJXe");
+declare_id!("2Fa5PQ8sMNN95P6n7hxWaeyvM2FTjPJsFXh17MQUw6V9");
 ```
