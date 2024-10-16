@@ -18,7 +18,7 @@ import { parseEventFromTransaction, bytesBuffer, bytes32Buffer } from "../script
 import assert from "assert";
 import { createHash } from 'crypto';
 
-export const FEE_ACCOUNT_FILL = Buffer.alloc(32).fill(1).toString('hex');
+export const FEE_ACCOUNT_FILL = '00000000000000000000000000000001';
 export const ZERO_ACCOUNT = new PublicKey(new Uint8Array(32).fill(0));
 console.log("Zero PublicKey:", ZERO_ACCOUNT.toBase58());
 

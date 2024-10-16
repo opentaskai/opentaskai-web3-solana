@@ -33,7 +33,7 @@ import {
   checkTransactionExecuted 
 } from "./common";
 import { deployToken, getTokenAccountBalance, getPDABalance } from "../scripts/tokens";
-import { airdrop, uuid, bytes32Buffer, bufferToArray } from "../scripts/utils";
+import { airdrop, uuid, bytes32Buffer, bufferToArray, bufferToBytes32 } from "../scripts/utils";
 import { getKeypair } from "../scripts/accounts";
 
 describe("payment", () => {
@@ -68,12 +68,15 @@ describe("payment", () => {
   const expiredAt = new anchor.BN(new Date().getTime() / 1000 + 1000000000);
 
   // Define constants at the beginning of the describe block
-  const SOL_DEPOSIT_ACCOUNT_FILL = Buffer.alloc(32).fill(2).toString('hex');
-  const TOKEN_DEPOSIT_ACCOUNT_FILL = Buffer.alloc(32).fill(3).toString('hex');
-  const USER2_SOL_ACCOUNT_FILL = Buffer.alloc(32).fill(4).toString('hex');
-  const USER2_TOKEN_ACCOUNT_FILL = Buffer.alloc(32).fill(5).toString('hex');
+  const SOL_DEPOSIT_ACCOUNT_FILL = '00000000000000000000000000000002';
+  const TOKEN_DEPOSIT_ACCOUNT_FILL = '00000000000000000000000000000003';
+  const USER2_SOL_ACCOUNT_FILL = '00000000000000000000000000000004';
+  const USER2_TOKEN_ACCOUNT_FILL = '00000000000000000000000000000005';
 
   const feeAccountBuffer = bytes32Buffer(FEE_ACCOUNT_FILL);
+  console.log('feeAccountBuffer:', feeAccountBuffer);
+  const feeAccountBytes32 = bufferToBytes32(feeAccountBuffer);
+  console.log('feeAccountBytes32:', feeAccountBytes32);
 
   before(async () => {
     // Request airdrop for the payer

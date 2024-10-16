@@ -47,7 +47,7 @@ export async function airdrop(payerKeypair: Keypair, connection: Connection, amo
   }
 }
 
-export function getDataFromTransaction(tx: any, programId: string, instruction: string) {
+export function getDataFromTransaction(tx: any, programId: string, instruction?: string) {
   // Verify that the transaction includes an instruction with your program ID
   const isProgramIdPresent = tx.transaction.message.instructions.some(instruction => {
     const programIdIndex = instruction.programIdIndex;
@@ -66,9 +66,12 @@ export function getDataFromTransaction(tx: any, programId: string, instruction: 
       throw new Error('not found programId:' + programId);
     }
     
-    const findInstruction = tx.meta.logMessages.find(log => log === 'Program log: Instruction: '+ instruction);
-    if(!findInstruction) {
-      throw new Error('not found instruction:' + instruction);
+    // Check if instruction is provided
+    if (instruction) {
+      const findInstruction = tx.meta.logMessages.find(log => log === 'Program log: Instruction: '+ instruction);
+      if(!findInstruction) {
+        throw new Error('not found instruction:' + instruction);
+      }
     }
 
     const programDataLog = tx.meta.logMessages.find(log => log.startsWith("Program data:"));
@@ -85,6 +88,7 @@ export function parseEventFromTransaction(tx: any, programId: string, instructio
   // console.log("Raw dataBuffer:", dataBuffer);
   if (instruction === 'Deposit') {
     return {
+      instruction,
       sn: dataBuffer.slice(8, 40), // First 32 bytes for sn
       account: dataBuffer.slice(40, 72), // Next 32 bytes for account
       token: new PublicKey(dataBuffer.slice(72, 104)), // Next 32 bytes for token
@@ -94,6 +98,7 @@ export function parseEventFromTransaction(tx: any, programId: string, instructio
     };
   } else if (instruction === 'Withdraw') {
     return {
+      instruction,
       sn: dataBuffer.slice(8, 40), // First 32 bytes for sn
       token: new PublicKey(dataBuffer.slice(40, 72)), // Next 32 bytes for token
       from: dataBuffer.slice(72, 104), // Next 32 bytes for from account
@@ -104,6 +109,7 @@ export function parseEventFromTransaction(tx: any, programId: string, instructio
     };
   } else if (instruction === 'Freeze') {
     return {
+      instruction,
       sn: dataBuffer.slice(8, 40), // First 32 bytes for sn
       account: dataBuffer.slice(40, 72), // Next 32 bytes for account
       token: new PublicKey(dataBuffer.slice(72, 104)), // Next 32 bytes for token
@@ -121,6 +127,7 @@ export function parseEventFromTransaction(tx: any, programId: string, instructio
     };
   } else if (instruction === 'Transfer') {
     return {
+      instruction,
       sn: dataBuffer.slice(8, 40), // First 32 bytes for sn
       token: new PublicKey(dataBuffer.slice(40, 72)), // Next 32 bytes for token
       from: dataBuffer.slice(72, 104), // Next 32 bytes for from account
@@ -133,6 +140,7 @@ export function parseEventFromTransaction(tx: any, programId: string, instructio
     };
   } else if (instruction === 'Settle') {
     return {
+      instruction,
       sn: dataBuffer.slice(8, 40), // First 32 bytes for sn
       token: new PublicKey(dataBuffer.slice(40, 72)), // Next 32 bytes for token
       from: dataBuffer.slice(72, 104), // Next 32 bytes for from account
@@ -156,6 +164,13 @@ export function uuid(){
     return v4().replace(/-/g, '');
 }
 
+export function bufferToArray(buf: Buffer) {
+  console.log('buf:', buf);
+  const res = Array.from(buf).map(byte => byte);
+  console.log('bufferToArray:', res);
+  return res;
+}
+
 export function bytesBuffer(snHex: string|number) {
   snHex = String(snHex);
   return Buffer.from(snHex, 'hex');
@@ -173,9 +188,11 @@ export function bytes32Buffer(snHex: string|number) {
   return res;
 }
 
-export function bufferToArray(buf: Buffer) {
-  console.log('buf:', buf);
-  const res = Array.from(buf).map(byte => byte);
-  console.log('bufferToArray:', res);
-  return res;
+export function bufferToBytes32(buffer: Buffer): string {
+  // Get the last 32 bytes and convert to hex string
+  const bytes = buffer.toString('hex');
+  if(bytes.substring(0, 32) === '00000000000000000000000000000000') {
+    return bytes.substring(32);
+  }
+  return bytes;
 }
