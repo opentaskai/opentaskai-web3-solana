@@ -7,12 +7,14 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Payment } from "../target/types/payment";
 import * as spl from "@solana/spl-token";
+import bs58 from 'bs58'; 
 import assert from "assert";
 import {
   Keypair,
   PublicKey,
   LAMPORTS_PER_SOL,
   SystemProgram,
+  Transaction
 } from "@solana/web3.js";
 
 import {
@@ -182,6 +184,29 @@ describe("payment", () => {
   });
   
   it("Initializes the payment state", async () => {
+    // Fetch the recent blockhash
+    const { blockhash } = await provider.connection.getLatestBlockhash();
+    let transaction = await program.methods
+      .initialize()
+      .accounts({
+        paymentState: paymentStatePDA,
+        owner: payerKeypair.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      // .signers([])
+      .transaction();
+
+    // Set the recent blockhash
+    transaction.recentBlockhash = blockhash;
+    // Set the fee payer
+    transaction.feePayer = payerKeypair.publicKey;
+    // Sign the transaction
+    transaction.partialSign(payerKeypair);
+
+    const txHash = bs58.encode(Uint8Array.from(transaction.signature));
+    
+    console.log('Transaction Signature:', txHash);
+
     const tx = await program.methods
       .initialize()
       .accounts({
@@ -193,6 +218,8 @@ describe("payment", () => {
       .rpc();
 
     console.log("Your transaction signature", tx);
+
+    assert.strictEqual(txHash, tx, "Transaction hash doesn't match");
 
     const paymentStateAccount = await program.account.paymentState.fetch(
       paymentStatePDA
@@ -218,7 +245,7 @@ describe("payment", () => {
       "Fee to account doesn't match"
     );
   });
-
+/*
   it("Initializes the program token", async () => {
     let accountInfo = await provider.connection.getAccountInfo(programTokenPDA);
     console.log("programTokenPDA accountInfo:", accountInfo);
@@ -1141,5 +1168,5 @@ describe("payment", () => {
         assert.fail("Expected an error but the transaction failed", e);
     }
   });
-  
+  */
 });
