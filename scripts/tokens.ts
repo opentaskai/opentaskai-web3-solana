@@ -48,6 +48,10 @@ export async function deployToken(connection: web3.Connection, payerKeypair: web
   return mint;
 }
 
+export async function getTokenInfo(connection: web3.Connection, mint: web3.PublicKey) {
+  return await token.getMint(connection, mint);
+} 
+
 export async function getTokenAccountBalance(connection: web3.Connection, mint: web3.PublicKey, owner: web3.PublicKey) {
   try {
     // Check if the mint is the native SOL mint

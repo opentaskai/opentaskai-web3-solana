@@ -32,7 +32,7 @@ import {
   SettlementData,
   checkTransactionExecuted 
 } from "./common";
-import { deployToken, getTokenAccountBalance, getPDABalance } from "../scripts/tokens";
+import { deployToken, getTokenInfo, getTokenAccountBalance, getPDABalance } from "../scripts/tokens";
 import { airdrop, uuid, bytes32Buffer, bufferToArray, bufferToBytes32 } from "../scripts/utils";
 import { getKeypair } from "../scripts/accounts";
 
@@ -93,6 +93,8 @@ describe("payment", () => {
 
     // Create a new mint
     mint = await deployToken(provider.connection, payerKeypair);
+    const tokenInfo = await getTokenInfo(provider.connection, mint);
+    console.log("Token info:", tokenInfo);
 
     // Create a token account for the user
     user1ATA = await spl
@@ -1071,7 +1073,6 @@ describe("payment", () => {
         assert.fail("Expected an error but the transaction failed:", e);
     }
   });
-
 
   it("Settle for SOL", async () => {
     const amount = new anchor.BN(LAMPORTS_PER_SOL / 100); // 0.1 SOL
