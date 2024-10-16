@@ -3,7 +3,7 @@ use anchor_spl::token::{Token};
 use anchor_spl::associated_token::AssociatedToken;
 use crate::state::{PaymentState, UserTokenAccount, TransactionRecord, SettlementData};
 
-declare_id!("BoRxccT2YtMbpcQ7dWYkxVTdfXEPrTCXpAWYXggCf3x1");
+declare_id!("CVnY7DzpU5TcJa8DyW4Nsgv2DVGWKHxWca1grt3EqKWT");
 
 pub mod state;
 pub mod errors;
