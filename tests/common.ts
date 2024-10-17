@@ -211,6 +211,9 @@ export async function depositWithMessage(
   }
   console.log("User token account:", tokenAccount.toBase58());
 
+  const payerPubkey = new PublicKey(payerKeypair.publicKey.toBase58());
+  const mintPubkey = new PublicKey(mint.toBase58());
+
   if (message == null) {
     // Create and sign the message
     message = Buffer.concat([
@@ -224,7 +227,10 @@ export async function depositWithMessage(
       tokenAccount.toBuffer(),  
     ]);
   }
-  console.log("SN before signing:", snBuffer.toString('hex')); // Log before signing
+  assert.strictEqual(payerPubkey.toBase58(), payerKeypair.publicKey.toBase58(),"payer public key does not match");
+  assert.strictEqual(payerPubkey.toBuffer().toString(), payerKeypair.publicKey.toBuffer().toString(),"payer public key does not match");
+  assert.strictEqual(mintPubkey.toBuffer().toString(), mint.toBuffer().toString(),"mint public key does not match");
+  console.log("message:", message.toString());
   const {ed25519Instruction, signature} = getEd25519Instruction(message, signerKeypair);
   console.log("Message for signing:", message.toString('hex'));
 

@@ -245,7 +245,7 @@ describe("payment", () => {
       "Fee to account doesn't match"
     );
   });
-/*
+
   it("Initializes the program token", async () => {
     let accountInfo = await provider.connection.getAccountInfo(programTokenPDA);
     console.log("programTokenPDA accountInfo:", accountInfo);
@@ -1168,5 +1168,5 @@ describe("payment", () => {
         assert.fail("Expected an error but the transaction failed", e);
     }
   });
-  */
+  
 });
