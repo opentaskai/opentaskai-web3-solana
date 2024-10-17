@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Keypair } from '@solana/web3.js';
-
+import bs58 from 'bs58'; 
 
 const AccountFile = path.join(__dirname, '../accounts.json');
 
@@ -38,13 +38,28 @@ export function getKeypair(keypairPath:string) {
   }
 }
 
-export function getBase58PublicKey(keypairPath:string) {
+export function toSecretKey(keypairPath:string) {
   const keypair = loadKeypair(keypairPath);
-  return keypair.publicKey.toBase58();
+  // To save the keypair as a Base58 string
+  return bs58.encode(keypair.secretKey);
+}
+
+export function getKeypairFromBase58Key(bs58Key:string) {
+  return Keypair.fromSecretKey(bs58.decode(bs58Key));
+}
+
+export function getBase58Key(keypairPath:string) {
+  const keypair = loadKeypair(keypairPath);
+  const pubKey = keypair.publicKey.toBase58();
+  const secretKey = bs58.encode(keypair.secretKey);
+  return {
+    pubKey,
+    secretKey
+  };
 }
 
 const args = process.argv.slice(2);
 console.log('accounts args:', args);
 if(args.length > 0 && args[0] !== '-r') {
-  console.log(getBase58PublicKey(args[0]));
+  console.log(getBase58Key(args[0]));
 }

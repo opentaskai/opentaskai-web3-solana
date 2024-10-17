@@ -43,6 +43,9 @@ describe("payment", () => {
   const payerKeypair = getKeypair(path.join(os.homedir(), '.config/solana/id.json'));
   console.log("Payer keypair:", payerKeypair.publicKey.toBase58());
 
+  const signerKeypair = getKeypair(path.join(os.homedir(), '.config/solana/local-signer.json'));
+  console.log("signer keypair:", signerKeypair.publicKey.toBase58());
+
   const feeToKeypair = getKeypair(path.join(os.homedir(), '.config/solana/local-feeto.json'));
   console.log("feeTo keypair:", feeToKeypair.publicKey.toBase58());
 
@@ -204,7 +207,6 @@ describe("payment", () => {
     transaction.partialSign(payerKeypair);
 
     const txHash = bs58.encode(Uint8Array.from(transaction.signature));
-    
     console.log('Transaction Signature:', txHash);
 
     const tx = await program.methods
@@ -348,7 +350,25 @@ describe("payment", () => {
         .rpc();
 
     } catch (error) {
-      console.error("Error initializing SPL program token:", error);
+      console.error("Error change fee to:", error);
+      throw error;
+    }
+  });
+
+  it("Change signer", async () => {
+    try {
+      const tx = await program.methods
+        .changeSigner()
+        .accounts({
+          paymentState: paymentStatePDA,
+          currentOwner: payerKeypair.publicKey,
+          newOwner: signerKeypair.publicKey,
+        })
+        .signers([payerKeypair])
+        .rpc();
+
+    } catch (error) {
+      console.error("Error change signer:", error);
       throw error;
     }
   });
@@ -377,7 +397,7 @@ describe("payment", () => {
         provider,
         program,
         payerKeypair,
-        payerKeypair,
+        signerKeypair,
         spl.NATIVE_MINT,
         sn,
         account,
@@ -403,13 +423,12 @@ describe("payment", () => {
       spl.NATIVE_MINT.toBuffer(),
       tokenAccount.toBuffer(),
     ]);
-    const signerKeypair = Keypair.generate();
     try {
       await depositWithMessage(
         provider,
         program,
         payerKeypair,
-        signerKeypair,
+        payerKeypair,
         spl.NATIVE_MINT,
         sn,
         account,
@@ -450,6 +469,7 @@ describe("payment", () => {
       provider,
       program,
       payerKeypair,
+      signerKeypair,
       sn,
       account,
       amount,
@@ -482,6 +502,7 @@ describe("payment", () => {
         provider,
         program,
         payerKeypair,
+        signerKeypair,
         sn,
         account,
         amount,
@@ -517,6 +538,7 @@ describe("payment", () => {
       provider,
       program,
       payerKeypair,
+      signerKeypair,
       mint,
       sn,
       account,
@@ -558,6 +580,7 @@ describe("payment", () => {
       provider,
       program,
       payerKeypair,
+      signerKeypair,
       depositSN,
       account,
       depositAmount,
@@ -585,7 +608,7 @@ describe("payment", () => {
       provider,
       program,
       payerKeypair,
-      payerKeypair,
+      signerKeypair,
       spl.NATIVE_MINT,
       withdrawSN,
       account,
@@ -668,6 +691,7 @@ describe("payment", () => {
       provider,
       program,
       payerKeypair,
+      signerKeypair,
       mint,
       uuid(),
       account,
@@ -722,7 +746,7 @@ describe("payment", () => {
       provider,
       program,
       payerKeypair,
-      payerKeypair,
+      signerKeypair,
       mint,
       withdrawSN,
       account,
@@ -814,7 +838,7 @@ describe("payment", () => {
         provider,
         program,
         payerKeypair,
-        payerKeypair,
+        signerKeypair,
         mint,
         withdrawSN,
         account,
@@ -844,7 +868,7 @@ describe("payment", () => {
         provider,
         program,
         payerKeypair,
-        payerKeypair,
+        signerKeypair,
         spl.NATIVE_MINT,
         sn,
         account,
@@ -863,7 +887,7 @@ describe("payment", () => {
         provider,
         program,
         payerKeypair,
-        payerKeypair,
+        signerKeypair,
         spl.NATIVE_MINT,
         sn,
         account,
@@ -885,7 +909,7 @@ describe("payment", () => {
         provider,
         program,
         payerKeypair,
-        payerKeypair,
+        signerKeypair,
         spl.NATIVE_MINT,
         sn,
         account,
@@ -910,7 +934,7 @@ describe("payment", () => {
         provider,
         program,
         payerKeypair,
-        payerKeypair,
+        signerKeypair,
         spl.NATIVE_MINT,
         sn,
         account,
@@ -934,7 +958,7 @@ describe("payment", () => {
         provider,
         program,
         payerKeypair,
-        payerKeypair,
+        signerKeypair,
         spl.NATIVE_MINT,
         uuid(),
         account,
@@ -964,7 +988,7 @@ describe("payment", () => {
         provider,
         program,
         payerKeypair,
-        payerKeypair,
+        signerKeypair,
         mint,
         uuid(),
         account,
@@ -975,7 +999,7 @@ describe("payment", () => {
         assert.fail("Expected an error but the transaction failed");
     }
 
-    console.log("Freeze SOL - Program Token PDA:", programSolPDA.toBase58());
+    console.log("Freeze Token - Program Token PDA:", programSolPDA.toBase58());
 
     // Record balances after freeze
     const programBalanceAfter = await provider.connection.getBalance(programTokenPDA);
@@ -986,7 +1010,7 @@ describe("payment", () => {
         provider,
         program,
         payerKeypair,
-        payerKeypair,
+        signerKeypair,
         mint,
         uuid(),
         account,
@@ -1016,7 +1040,7 @@ describe("payment", () => {
         provider,
         program,
         payerKeypair,
-        payerKeypair,
+        signerKeypair,
         mint,
         uuid(),
         account,
@@ -1044,7 +1068,7 @@ describe("payment", () => {
         provider,
         program,
         payerKeypair,
-        payerKeypair,
+        signerKeypair,
         spl.NATIVE_MINT,
         user2Keypair.publicKey,
         feeToKeypair.publicKey,
@@ -1085,7 +1109,7 @@ describe("payment", () => {
         provider,
         program,
         payerKeypair,
-        payerKeypair,
+        signerKeypair,
         mint,
         user2ATA,
         feeATA,
@@ -1122,7 +1146,7 @@ describe("payment", () => {
         provider,
         program,
         payerKeypair,
-        payerKeypair,
+        signerKeypair,
         spl.NATIVE_MINT,
         user2Keypair.publicKey,
         feeToKeypair.publicKey,
@@ -1156,7 +1180,7 @@ describe("payment", () => {
         provider,
         program,
         payerKeypair,
-        payerKeypair,
+        signerKeypair,
         mint,
         user2ATA,
         feeATA,

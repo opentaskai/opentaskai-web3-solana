@@ -92,7 +92,7 @@ export function getEd25519Instruction(message: Buffer, signerKeypair: Keypair) {
 }
 
 export function signMessageForEd25519(message: Buffer, signerKeypair: Keypair) {
-  const signature = nacl.sign.detached(message, signerKeypair.secretKey);
+  const signature = nacl.sign.detached(Uint8Array.from(message), signerKeypair.secretKey);
   console.log("Signature:", signature);
   return signature;
 }
@@ -122,19 +122,21 @@ export async function depositSol(
   provider: anchor.AnchorProvider,
   program: Program<Payment>,
   payerKeypair: Keypair,
+  signerKeypair: Keypair,
   sn: string,
   account: string,
   amount: anchor.BN,
   frozen: anchor.BN,
   expiredAt: anchor.BN
 ) {
-  return deposit(provider, program, payerKeypair, payerKeypair, spl.NATIVE_MINT, sn, account, amount, frozen, expiredAt);
+  return deposit(provider, program, payerKeypair, signerKeypair, spl.NATIVE_MINT, sn, account, amount, frozen, expiredAt);
 }
 
 export async function depositTokens(
   provider: anchor.AnchorProvider,
   program: Program<Payment>,
   payerKeypair: Keypair,
+  signerKeypair: Keypair,
   mint: PublicKey,
   sn: string,
   account: string,
@@ -142,7 +144,7 @@ export async function depositTokens(
   frozen: anchor.BN,
   expiredAt: anchor.BN
 ) {
-  return deposit(provider, program, payerKeypair, payerKeypair, mint, sn, account, amount, frozen, expiredAt);
+  return deposit(provider, program, payerKeypair, signerKeypair, mint, sn, account, amount, frozen, expiredAt);
 }
 
 
@@ -208,6 +210,13 @@ export async function depositWithMessage(
       payerKeypair.publicKey
     );
     tokenAccount = userTokenAccount.address;
+
+    const associatedTokenAddress = await spl.getAssociatedTokenAddress(
+        mint,
+        payerKeypair.publicKey
+      );
+
+    assert.strictEqual(tokenAccount.toBase58(), associatedTokenAddress.toBase58(),"payer token public key does not match");
   }
   console.log("User token account:", tokenAccount.toBase58());
 
