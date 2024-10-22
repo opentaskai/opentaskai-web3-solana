@@ -371,6 +371,17 @@ describe("payment", () => {
       console.error("Error change signer:", error);
       throw error;
     }
+
+    const paymentStateAccount = await program.account.paymentState.fetch(
+      paymentStatePDA
+    );
+    console.log("paymentState:", paymentStateAccount);
+
+    assert.strictEqual(
+      paymentStateAccount.signer.toBase58(),
+      signerKeypair.publicKey.toBase58(),
+      "signer public key doesn't match"
+    );
   });
 
   it("Fails to deposit SOL with incorrect signature", async () => {
